@@ -1,0 +1,42 @@
+---
+title: "Authentifizierung"
+description: "Bearer-Token: Service-Key oder WP-JWT des Anwalts."
+---
+
+Alle Requests brauchen einen Bearer-Token:
+
+```
+Authorization: Bearer <TOKEN>
+```
+
+Es gibt zwei Modi — **beide** Endpunkte akzeptieren beide:
+
+<CardGroup cols={2}>
+  <Card title="Service-Key (M2M)" icon="key">
+    Authentifiziert deinen **Server**. Keine Anwalts-Identität. Einfach für reine
+    Maschine-zu-Maschine-Aufrufe.
+  </Card>
+  <Card title="WP-JWT des Anwalts (empfohlen)" icon="user-check">
+    Reichst du das finditoo-Token des eingeloggten Anwalts durch, wird dessen
+    **Identität automatisch aufgelöst** — ideal fürs Feedback (Per-Anwalt-Zuordnung).
+  </Card>
+</CardGroup>
+
+## Welchen Modus wann?
+
+- **Generierung:** Service-Key genügt (M2M). Mit WP-JWT wird die Generierung dem
+  Anwalt zugeordnet.
+- **Feedback:** WP-JWT **empfohlen** — dann kommen `user_name`/`user_email`
+  automatisch aus dem Token, und nichts geht verloren. Mit Service-Key gib die
+  Identität im Body an (`user_name`/`user_email`).
+
+<Warning>
+  Behandle Tokens wie Passwörter. **Niemals** in Chats, Slack, Tickets oder
+  Client-seitigem Code ablegen. Bei Verdacht auf Kompromittierung: Key widerrufen
+  und neuen anfordern.
+</Warning>
+
+<Note>
+  Anonyme Feedback-Submissions (ohne auflösbare Identität) werden nicht still
+  verworfen — die Response signalisiert `stored: false` mit Grund.
+</Note>

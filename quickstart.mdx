@@ -1,0 +1,55 @@
+---
+title: "Quickstart"
+description: "In zwei Requests vom Thema zum verlinkten Rechtstipp — plus Feedback."
+---
+
+<Steps>
+  <Step title="Token bereithalten">
+    Du brauchst einen Bearer-Token — deinen **Service-Key** oder ein **WP-JWT**
+    des Anwalts. Details unter [Authentifizierung](/authentication).
+  </Step>
+  <Step title="Rechtstipp generieren">
+    Minimal genügt `topic` + `land`. `filters` weglassen → der Land-Default greift.
+
+    ```bash
+    curl -X POST https://app.lex-gpt.ai/api/generate-rechtstipp \
+      -H "Authorization: Bearer $LEXGPT_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "topic": "Kündigungsfristen im Mietrecht",
+        "kind": "rechtstipp",
+        "land": "AT",
+        "as_of": "2026-07-23"
+      }'
+    ```
+
+    Die Antwort enthält den Artikel als `markdown` (mit `[§ …]`-Markern),
+    `markdown_clean` (ohne Marker) und — für fertige Links — `markdown_linked`
+    (Paragraphen bereits als `[Label](URL)`; siehe
+    [Paragraphen verlinken](/guides/citations-links)).
+  </Step>
+  <Step title="Feedback zurückgeben">
+    Verknüpfe das Feedback über `target_id` mit deinem Rechtstipp. Mit WP-JWT
+    kommt die Anwalts-Identität automatisch.
+
+    ```bash
+    curl -X POST https://app.lex-gpt.ai/api/feedback \
+      -H "Authorization: Bearer $ANWALT_WP_JWT" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "session_id": "tipp_8f2a",
+        "content_type": "rechtstipp",
+        "target_id": "tipp_8f2a",
+        "target_title": "Kündigungsfristen im Mietrecht",
+        "feedback": "green"
+      }'
+    ```
+
+    Die Response enthält `stored: true`, wenn gespeichert wurde.
+  </Step>
+</Steps>
+
+<Note>
+  Aktuell ist nur **AT** freigeschaltet. `land: "DE"` / `"CH"` liefern `400`
+  (auf der Roadmap).
+</Note>

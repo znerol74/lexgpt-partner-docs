@@ -1,0 +1,72 @@
+---
+title: "Feedback"
+description: "Rückmeldung mit dem richtigen Rechtstipp verknüpfen — Minimal-Payload und Werte."
+---
+
+`POST /feedback` speichert eine Rückmeldung. Für Rechtstipps genügt ein kleiner
+Payload — du musst die **Original-Antwort nicht speichern**; die Verknüpfung läuft
+über `target_id`.
+
+## Minimaler Payload (Rechtstipp)
+
+```bash
+curl -X POST https://app.lex-gpt.ai/api/feedback \
+  -H "Authorization: Bearer $ANWALT_WP_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "tipp_8f2a",
+    "content_type": "rechtstipp",
+    "target_id": "tipp_8f2a",
+    "target_title": "Kündigungsfristen im Mietrecht",
+    "feedback": "green",
+    "comment": "Sehr brauchbar"
+  }'
+```
+
+## Felder
+
+| Feld | Pflicht | Beschreibung |
+| --- | --- | --- |
+| `session_id` | ✓ | Gruppierungs-ID. Für Rechtstipps deine Rechtstipp-ID. |
+| `feedback` | ✓ | Wert (siehe unten). |
+| `content_type` | – | `rechtstipp` setzen (Default `ask`). So unterscheidet das Admin-Board nach Typ. |
+| `target_id` | – (empf.) | **Deine** Rechtstipp-ID → verknüpft das Feedback eindeutig. |
+| `target_title` | – | Titel/Thema für die Anzeige. |
+| `comment` | – | Freitext. |
+| `answer`, `sources` | – | Optionaler Snapshot des bewerteten Textes. |
+| `user_name`, `user_email` | – | Nur ohne WP-JWT nötig (siehe Identität). |
+
+## Werte
+
+Kanonisch ist die Ampel:
+
+- `green` — gut
+- `yellow` — teils
+- `red` — schlecht
+
+Für Daumen-UIs werden `positive` → `green` und `negative` → `red` gemappt. Sende
+also einen der fünf Werte.
+
+## Identität des Anwalts
+
+<CardGroup cols={2}>
+  <Card title="Mit WP-JWT (empfohlen)" icon="user-check">
+    Reiche das finditoo-Token des Anwalts als Bearer durch — `user_name`/
+    `user_email` werden **automatisch aus dem Token** aufgelöst. Nichts weiter nötig.
+  </Card>
+  <Card title="Mit Service-Key" icon="key">
+    Kein Anwalts-Kontext im Token → gib `user_name` und `user_email` im Body an,
+    sonst fehlt die „welcher Anwalt"-Info.
+  </Card>
+</CardGroup>
+
+## Response
+
+```json
+{ "stored": true }
+```
+
+<Note>
+  Kein stiller Verlust mehr: lässt sich das Feedback keiner Identität zuordnen,
+  kommt `{ "stored": false, "reason": "…" }` zurück statt einer leeren 200.
+</Note>

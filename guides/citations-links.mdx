@@ -1,0 +1,72 @@
+---
+title: "Paragraphen verlinken"
+description: "Warum die Links vorher nicht ankamen — und wie du sie bekommst."
+---
+
+Im generierten Artikel stehen Quellen-Marker wie `[§ 1295 ABGB]` als **Text** im
+`markdown`-Feld — sie sind noch **keine** Links. Die passenden URLs stecken pro
+Quelle in `sources[].html_url`. Die API löst diese Zuordnung serverseitig auf, du
+musst sie **nicht** selbst nachbauen.
+
+Du hast drei Felder — je nach Bedarf:
+
+<CardGroup cols={3}>
+  <Card title="markdown_linked" icon="link">
+    Fertig verlinkt. Einfach durchreichen.
+  </Card>
+  <Card title="markdown_tokenized + citations" icon="code">
+    Granulare Kontrolle (eigene Chips/Panel).
+  </Card>
+  <Card title="markdown" icon="file">
+    Roh, mit `[§ …]`-Markern als Text.
+  </Card>
+</CardGroup>
+
+## Der einfache Weg: `markdown_linked`
+
+Enthält die Paragraphen bereits als Markdown-Links `[§ 1295 ABGB](https://…)`.
+Nimm einfach dieses Feld statt `markdown` — fertig.
+
+<Info>
+  Brauchst du eigene Chips oder ein eigenes Quellen-Panel, nutze stattdessen
+  `markdown_tokenized` + `citations` (granulare Kontrolle, siehe unten).
+</Info>
+
+## Granular: aus `markdown_tokenized` + `citations`
+
+`markdown_tokenized` ist der Artikel, in dem jeder Marker durch `{{CITATION_n}}`
+ersetzt ist. `citations[n]` beschreibt die Auflösung:
+
+```json
+{
+  "index": 0,
+  "marker": "§ 1295 ABGB",
+  "label": "§ 1295 ABGB",
+  "matched": true,
+  "source_index": 3,
+  "url": "https://www.ris.bka.gv.at/…"
+}
+```
+
+Ersetze jedes Token durch `[label](url)` (bei Treffer) bzw. `[marker]` (ohne):
+
+```js
+function linkify(tokenized, citations) {
+  return tokenized.replace(/\{\{CITATION_(\d+)\}\}/g, (_, i) => {
+    const c = citations[Number(i)];
+    if (!c) return "";
+    return c.matched && c.url ? `[${c.label}](${c.url})` : `[${c.label}]`;
+  });
+}
+```
+
+<Note>
+  Nicht jeder Marker findet eine Quelle (`matched: false`) — z. B. Mehrfach-§§
+  wie `§§ 30, 31 IO`. Diese bleiben bewusst unverlinkter Text, damit nie ein
+  falscher Link entsteht.
+</Note>
+
+## Sauberer Veröffentlichungstext
+
+Willst du den Text **ohne** Marker und **ohne** Links (z. B. als Kopiervorlage),
+nimm `markdown_clean` bzw. `html`.

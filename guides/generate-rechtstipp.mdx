@@ -1,0 +1,85 @@
+---
+title: "Rechtstipp generieren"
+description: "Thema → recherchierter, verlinkter Artikel. Parameter, Länder, Defaults."
+---
+
+`POST /generate-rechtstipp` erzeugt aus einem Thema einen recherchierten,
+SEO-tauglichen Artikel (österreichisches Recht). Die konkreten rechtlichen
+Aussagen werden mit `[§ …]`-Markern belegt und als Links aufbereitet.
+
+## Minimaler Request
+
+Nur `topic` + `land` — `filters` weglassen, dann greift der Land-Default:
+
+```bash
+curl -X POST https://app.lex-gpt.ai/api/generate-rechtstipp \
+  -H "Authorization: Bearer $LEXGPT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "topic": "Kündigungsfristen im Mietrecht", "kind": "rechtstipp", "land": "AT", "as_of": "2026-07-23" }'
+```
+
+## Parameter
+
+| Feld | Typ | Default | Beschreibung |
+| --- | --- | --- | --- |
+| `topic` | string | — | **Pflicht.** Thema/Fragestellung. |
+| `kind` | `rechtstipp` \| `blog` | `rechtstipp` | Kurz (Endkunden) vs. länger (Fachpublikum). |
+| `land` | `AT` \| `DE` \| `CH` | `AT` | Rechtsordnung + Wording. Aktuell nur **AT** freigeschaltet. |
+| `filters` | FilterConfig | Land-Default | Retrieval-Scope. Weglassen → Land-Default. |
+| `as_of` | date | — | Stichtag (YYYY-MM-DD). |
+| `min_words` / `max_words` | int | kind-abhängig | Längen-Korridor. |
+
+<Warning>
+  `land` steuert Formulierung und Rechtsordnung, **nicht** die
+  Retrieval-Jurisdiktion — die kommt aus `filters.geographic`. Für AT passen
+  Land-Default und `geographic: ["bundesrecht"]` zusammen.
+</Warning>
+
+## Länder
+
+Nur **AT** ist freigeschaltet. `land: "DE"` oder `"CH"` liefern:
+
+```json
+{ "detail": "Land 'DE' ist noch nicht freigeschaltet. Aktuell verfügbar: AT." }
+```
+
+ISO-Codes werden bevorzugt; Alt-Freitext (`"Österreich"`) wird toleriert und auf
+`AT` normalisiert.
+
+## AT-Default-Filter
+
+Lässt du `filters` weg, verwendet der Server:
+
+```json
+{
+  "geographic": ["bundesrecht"],
+  "legislation": true,
+  "judikatur": true,
+  "courts": [],
+  "germanCourts": [],
+  "swissCantons": [],
+  "eurlex": true,
+  "documentTypes": []
+}
+```
+
+Du kannst den Block voll überschreiben — die möglichen Werte liefert
+[`GET /rechtstipp/options`](/guides/options).
+
+## Antwort
+
+| Feld | Beschreibung |
+| --- | --- |
+| `title` | Generierte H1. |
+| `markdown` | Artikel **mit** `[§ …]`-Markern. |
+| `markdown_clean` | Artikel **ohne** Marker (Veröffentlichung/Kopieren). |
+| `markdown_linked` | Artikel mit Paragraphen als `[Label](URL)`. → [Links](/guides/citations-links) |
+| `markdown_tokenized` + `citations` | Marker als `{{CITATION_n}}` + Auflösungs-Map (granulare Integration). |
+| `html` / `html_linked` | Minimal-HTML (marker-frei / mit Links). |
+| `word_count` | Wortzahl (marker-frei gezählt). |
+| `sources` | Recherche-Quellen (inkl. `html_url`). |
+
+<Note>
+  Für **verlinkte Paragraphen** ist `markdown_linked` der einfachste Weg — einfach
+  statt `markdown` durchreichen. Details: [Paragraphen verlinken](/guides/citations-links).
+</Note>

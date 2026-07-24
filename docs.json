@@ -1,0 +1,55 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "LexGPT Partner API",
+  "description": "Öffentliche API für die Generierung von Rechtstipps und für Feedback.",
+  "colors": {
+    "primary": "#1F3A5F",
+    "light": "#4C7AB0",
+    "dark": "#152A47"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Dokumentation",
+        "groups": [
+          {
+            "group": "Erste Schritte",
+            "pages": ["introduction", "quickstart", "authentication"]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/generate-rechtstipp",
+              "guides/options",
+              "guides/citations-links",
+              "guides/feedback"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API-Referenz",
+        "groups": [
+          {
+            "group": "Endpunkte",
+            "openapi": "openapi.yaml"
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "primary": {
+      "type": "button",
+      "label": "app.lex-gpt.ai",
+      "href": "https://app.lex-gpt.ai"
+    }
+  },
+  "footer": {
+    "socials": {
+      "website": "https://lex-gpt.ai"
+    }
+  }
+}
