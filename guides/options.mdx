@@ -18,7 +18,7 @@ curl https://dashboard.lex-gpt.ai/api/rechtstipp/options?country=AT \
   -H "Authorization: Bearer $LEXGPT_TOKEN"
 ```
 
-## Antwort (Form)
+## Antwort (AT — vollständig)
 
 ```json
 {
@@ -37,13 +37,21 @@ curl https://dashboard.lex-gpt.ai/api/rechtstipp/options?country=AT \
     "geographic": [
       { "value": "bundesrecht", "label": "Bundesrecht" },
       { "value": "wien", "label": "Wien" },
-      { "value": "niederoesterreich", "label": "Niederösterreich" }
+      { "value": "niederoesterreich", "label": "Niederösterreich" },
+      { "value": "oberoesterreich", "label": "Oberösterreich" },
+      { "value": "burgenland", "label": "Burgenland" },
+      { "value": "steiermark", "label": "Steiermark" },
+      { "value": "kaernten", "label": "Kärnten" },
+      { "value": "salzburg", "label": "Salzburg" },
+      { "value": "tirol", "label": "Tirol" },
+      { "value": "vorarlberg", "label": "Vorarlberg" }
     ],
     "courts": [
       { "value": "Justiz", "label": "Ordentliche Gerichte (inkl. OGH)" },
       { "value": "Vfgh", "label": "Verfassungsgerichtshof (VfGH)" },
       { "value": "Vwgh", "label": "Verwaltungsgerichtshof (VwGH)" }
     ],
+    "swissCantons": [],
     "documentTypes": [],
     "flags": [
       { "value": "legislation", "label": "Gesetze/Legislation" },

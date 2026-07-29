@@ -36,6 +36,14 @@ Du hast drei Felder — je nach Bedarf:
 Enthält die Paragraphen bereits als Markdown-Links `[§ 1295 ABGB](https://…)`.
 Nimm einfach dieses Feld statt `markdown` — fertig.
 
+<Warning>
+  Die Quellen-Verlinkung löst aktuell **AT**-Quellen auf (RIS/EUR-Lex). Bei
+  **CH**-Artikeln bleiben die Marker derzeit überwiegend unverlinkt
+  (`matched: false`) — `markdown_linked` entspricht dann dem Text ohne Links;
+  für die Veröffentlichung nimm `markdown_clean` bzw. `html`. Fedlex-Links für
+  CH sind in Arbeit.
+</Warning>
+
 <Info>
   Brauchst du eigene Chips oder ein eigenes Quellen-Panel, nutze stattdessen
   `markdown_tokenized` + `citations` (granulare Kontrolle, siehe unten).

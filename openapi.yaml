@@ -430,7 +430,9 @@ components:
           type: string
           description: |
             Artikel mit Paragraphen bereits als `[Label](URL)` eingebettet — der
-            einfachste Weg zu verlinkten Paragraphen.
+            einfachste Weg zu verlinkten Paragraphen. Hinweis: die Auflösung
+            greift aktuell für AT-Quellen (RIS/EUR-Lex); bei CH bleiben Marker
+            derzeit überwiegend unverlinkt (Fedlex-Verlinkung in Arbeit).
         html:
           type: string
           description: Minimal-HTML (marker-frei).
