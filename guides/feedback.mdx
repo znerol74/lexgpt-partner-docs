@@ -3,21 +3,20 @@ title: "Feedback"
 description: "Rückmeldung mit dem richtigen Rechtstipp verknüpfen — Minimal-Payload und Werte."
 ---
 
-`POST /feedback` speichert eine Rückmeldung. Für Rechtstipps genügt ein kleiner
-Payload — du musst die **Original-Antwort nicht speichern**; die Verknüpfung läuft
-über `target_id`.
+`POST /feedback` speichert eine Rückmeldung. Für Rechtstipps genügt die **`id`**
+aus der [Erstellen-Response](/guides/rechtstipps) als `target_id` — du musst vom
+Tipp **nichts** mitsenden. Das Admin-Board verknüpft über die `id` und zeigt
+Thema (LLM-Input) und Original-Text (LLM-Output) des Tipps.
 
 ## Minimaler Payload (Rechtstipp)
 
 ```bash
-curl -X POST https://app.lex-gpt.ai/api/feedback \
+curl -X POST https://dashboard.lex-gpt.ai/api/feedback \
   -H "Authorization: Bearer $ANWALT_WP_JWT" \
   -H "Content-Type: application/json" \
   -d '{
-    "session_id": "tipp_8f2a",
     "content_type": "rechtstipp",
-    "target_id": "tipp_8f2a",
-    "target_title": "Kündigungsfristen im Mietrecht",
+    "target_id": "3f1c2b4a-5d6e-7089-a1b2-c3d4e5f60718",
     "feedback": "green",
     "comment": "Sehr brauchbar"
   }'
@@ -27,13 +26,12 @@ curl -X POST https://app.lex-gpt.ai/api/feedback \
 
 | Feld | Pflicht | Beschreibung |
 | --- | --- | --- |
-| `session_id` | ✓ | Gruppierungs-ID. Für Rechtstipps deine Rechtstipp-ID. |
 | `feedback` | ✓ | Wert (siehe unten). |
-| `content_type` | – | `rechtstipp` setzen (Default `ask`). So unterscheidet das Admin-Board nach Typ. |
-| `target_id` | – (empf.) | **Deine** Rechtstipp-ID → verknüpft das Feedback eindeutig. |
-| `target_title` | – | Titel/Thema für die Anzeige. |
+| `target_id` | ✓ (Rechtstipp) | Die **`id`** aus der Erstellen-Response → verknüpft das Feedback mit dem Tipp. |
+| `content_type` | – | `rechtstipp` (bzw. `blog`) setzen; Default `ask`. |
+| `session_id` | – | Gruppierungs-ID; fehlt sie, defaultet der Server auf `target_id`. |
 | `comment` | – | Freitext. |
-| `answer`, `sources` | – | Optionaler Snapshot des bewerteten Textes. |
+| `target_title` | – | Nur Fallback-Anzeige, falls kein `target_id`-Join greift. |
 | `user_name`, `user_email` | – | Nur ohne WP-JWT nötig (siehe Identität). |
 
 ## Werte

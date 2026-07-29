@@ -1,0 +1,143 @@
+---
+title: "Rechtstipp erstellen & verwalten"
+description: "Thema → recherchierter, verlinkter Artikel — gespeichert, mit id fürs Feedback."
+---
+
+`POST /rechtstipps` erzeugt aus einem Thema einen recherchierten,
+SEO-tauglichen Artikel (österreichisches oder Schweizer Recht, je nach `land`),
+**speichert** ihn im Verlauf des Anwalts und gibt ihn inklusive **`id`** zurück. Diese `id` verwendest du beim
+[Feedback](/guides/feedback) als `target_id` — mehr musst du nicht mitschicken.
+
+<Note>
+  **Auth:** Der Tipp-Lebenszyklus läuft pro eingeloggtem Anwalt und erfordert
+  dessen **finditoo-WP-JWT**. Ein reiner Service-Key wird hier mit `403`
+  abgewiesen. Siehe [Authentifizierung](/authentication).
+</Note>
+
+## Erstellen
+
+Minimal genügt `topic` + `land` — `filters` weglassen, dann greift der
+Land-Default:
+
+```bash
+curl -X POST https://dashboard.lex-gpt.ai/api/rechtstipps \
+  -H "Authorization: Bearer $ANWALT_WP_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{ "topic": "Kündigungsfristen im Mietrecht", "kind": "rechtstipp", "land": "AT", "as_of": "2026-07-23" }'
+```
+
+<Warning>
+  Recherche + Generierung dauern **~1 Minute**. Setze das Client-Timeout
+  entsprechend großzügig (≥ 120 s).
+</Warning>
+
+## Parameter
+
+| Feld | Typ | Default | Beschreibung |
+| --- | --- | --- | --- |
+| `topic` | string | — | **Pflicht.** Thema/Fragestellung. |
+| `kind` | `rechtstipp` \| `blog` | `rechtstipp` | Kurz (Endkunden) vs. länger (Fachpublikum). |
+| `land` | `AT` \| `DE` \| `CH` | `AT` | Rechtsordnung + Wording. Verfügbar: **AT** und **CH**. |
+| `filters` | FilterConfig | Land-Default | Retrieval-Scope. Weglassen → Land-Default. |
+| `as_of` | date | — | Stichtag (YYYY-MM-DD). |
+
+<Warning>
+  `land` steuert Formulierung und Rechtsordnung, **nicht** die
+  Retrieval-Jurisdiktion — die kommt aus `filters.geographic`. Für AT passen
+  Land-Default und `geographic: ["bundesrecht"]` zusammen.
+</Warning>
+
+## Länder
+
+Verfügbar sind **AT** und **CH**. `land: "DE"` liefert `400`:
+
+```json
+{ "detail": "Land 'DE' ist noch nicht freigeschaltet. Aktuell verfügbar: AT, CH." }
+```
+
+ISO-Codes werden bevorzugt; Alt-Freitext (`"Österreich"`, `"Schweiz"`) wird
+toleriert und normalisiert.
+
+## Default-Filter pro Land
+
+Lässt du `filters` weg, verwendet der Server den Land-Default:
+
+<CodeGroup>
+
+```json AT
+{
+  "geographic": ["bundesrecht"],
+  "legislation": true,
+  "judikatur": true,
+  "courts": [],
+  "germanCourts": [],
+  "swissCantons": [],
+  "eurlex": true,
+  "documentTypes": []
+}
+```
+
+```json CH
+{
+  "geographic": ["ch"],
+  "legislation": true,
+  "judikatur": true,
+  "courts": [],
+  "germanCourts": [],
+  "swissCantons": [],
+  "eurlex": false,
+  "documentTypes": []
+}
+```
+
+</CodeGroup>
+
+Du kannst den Block voll überschreiben — die möglichen Werte liefert
+[`GET /rechtstipp/options`](/guides/options). Für die Schweiz kannst du
+zusätzlich zum Bundesrecht kantonales Recht einbeziehen:
+`"swissCantons": ["ZH", "BE"]` (2-Buchstaben-Codes aus den Optionen).
+
+## Antwort
+
+Die Erstellen-Response enthält den kompletten Artikel in allen Varianten — plus
+`id` und `created_at`:
+
+| Feld | Beschreibung |
+| --- | --- |
+| `id` | **Tipp-ID** → beim Feedback als `target_id`. |
+| `created_at` | Zeitstempel. |
+| `title` | Generierte H1. |
+| `markdown` | Artikel **mit** `[§ …]`-Markern. |
+| `markdown_clean` | Artikel **ohne** Marker (Veröffentlichung/Kopieren). |
+| `markdown_linked` | Artikel mit Paragraphen als `[Label](URL)`. → [Links](/guides/citations-links) |
+| `markdown_tokenized` + `citations` | Marker als `{{CITATION_n}}` + Auflösungs-Map (granulare Integration). |
+| `html` / `html_linked` | Minimal-HTML (marker-frei / mit Links). |
+| `word_count` | Wortzahl (marker-frei gezählt). |
+| `sources` | Recherche-Quellen (inkl. `html_url`). |
+
+<Note>
+  Für **verlinkte Paragraphen** ist `markdown_linked` der einfachste Weg — einfach
+  statt `markdown` durchreichen. Details: [Paragraphen verlinken](/guides/citations-links).
+</Note>
+
+## Verwalten (Verlauf)
+
+Alle Tipps gehören dem Anwalt (per WP-JWT); es ist derselbe Verlauf, den das
+LexGPT-Dashboard zeigt.
+
+| Aufruf | Zweck |
+| --- | --- |
+| `GET /rechtstipps?kind=all` | Verlaufsliste (ohne Volltext), neueste zuerst. |
+| `GET /rechtstipps/{id}` | Einen Tipp mit Volltext laden. |
+| `PATCH /rechtstipps/{id}` | `markdown`/`html`/`title` vor der Veröffentlichung bearbeiten. |
+| `DELETE /rechtstipps/{id}` | Tipp löschen. |
+
+<Info>
+  `GET`/`PATCH` liefern neben `markdown`/`html`/`sources` auch die
+  **persistierten** `markdown_tokenized` + `citations` — nach einem `PATCH` mit
+  neuem `markdown` frisch gegen die gespeicherten Quellen aufgelöst. Nur die
+  fertig verlinkten Felder (`markdown_linked`/`html_linked`) gibt es
+  ausschließlich auf der **Erstellen**-Response (aus Tokens + Map jederzeit
+  clientseitig baubar). Bearbeitest du einen Tipp per `PATCH`, bleibt das
+  Original der Generierung intern erhalten (für die Feedback-Diagnose).
+</Info>

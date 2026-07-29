@@ -9,12 +9,14 @@ Alle Requests brauchen einen Bearer-Token:
 Authorization: Bearer <TOKEN>
 ```
 
-Es gibt zwei Modi — **beide** Endpunkte akzeptieren beide:
+Es gibt zwei Modi. **Wichtig:** Der Tipp-Lebenszyklus (`/rechtstipps`) erfordert
+das **WP-JWT des Anwalts** — ein reiner Service-Key wird dort mit `403`
+abgewiesen. `/feedback` und `/rechtstipp/options` akzeptieren beide Modi.
 
 <CardGroup cols={2}>
   <Card title="Service-Key (M2M)" icon="key">
-    Authentifiziert deinen **Server**. Keine Anwalts-Identität. Einfach für reine
-    Maschine-zu-Maschine-Aufrufe.
+    Authentifiziert deinen **Server**, ohne Anwalts-Identität. Nur für `/feedback`
+    und `/rechtstipp/options` — **nicht** für `/rechtstipps` (dort `403`).
   </Card>
   <Card title="WP-JWT des Anwalts (empfohlen)" icon="user-check">
     Reichst du das finditoo-Token des eingeloggten Anwalts durch, wird dessen
@@ -24,11 +26,13 @@ Es gibt zwei Modi — **beide** Endpunkte akzeptieren beide:
 
 ## Welchen Modus wann?
 
-- **Generierung:** Service-Key genügt (M2M). Mit WP-JWT wird die Generierung dem
-  Anwalt zugeordnet.
-- **Feedback:** WP-JWT **empfohlen** — dann kommen `user_name`/`user_email`
-  automatisch aus dem Token, und nichts geht verloren. Mit Service-Key gib die
-  Identität im Body an (`user_name`/`user_email`).
+- **Rechtstipps (`/rechtstipps`):** **WP-JWT erforderlich.** Der Tipp gehört dem
+  Anwalt und landet in seinem Verlauf; ein Service-Key hat keine Anwalts-Identität
+  und bekommt `403`.
+- **Feedback (`/feedback`):** WP-JWT **empfohlen** — dann kommen `user_name`/
+  `user_email` automatisch aus dem Token, und nichts geht verloren. Mit
+  Service-Key gib die Identität im Body an (`user_name`/`user_email`).
+- **Optionen (`/rechtstipp/options`):** beide Modi genügen.
 
 <Warning>
   Behandle Tokens wie Passwörter. **Niemals** in Chats, Slack, Tickets oder

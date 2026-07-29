@@ -14,7 +14,7 @@ Default-Filter-Block **und** die gültigen Auswahlwerte je Feld. Damit kannst du
 einen Selektor bauen, ohne Werte hart zu kodieren.
 
 ```bash
-curl https://app.lex-gpt.ai/api/rechtstipp/options?country=AT \
+curl https://dashboard.lex-gpt.ai/api/rechtstipp/options?country=AT \
   -H "Authorization: Bearer $LEXGPT_TOKEN"
 ```
 
@@ -57,9 +57,55 @@ curl https://app.lex-gpt.ai/api/rechtstipp/options?country=AT \
 <Note>
   Die `geographic`-Werte sind die ASCII-Slugs, die das Retrieval direkt
   akzeptiert (`niederoesterreich`, `kaernten` …) — übernimm sie 1:1 in
-  `filters.geographic`. Anfangs ist nur `country=AT` befüllt; `DE`/`CH` liefern
-  `400`, solange die Länder nicht freigeschaltet sind.
+  `filters.geographic`. Verfügbar sind `country=AT` und `country=CH`; `DE`
+  liefert `400`, solange das Land nicht freigeschaltet ist.
 </Note>
+
+## Schweiz (`country=CH`)
+
+Für die Schweiz ist `geographic` der landesweite Scope (`[{ "value": "ch",
+"label": "Schweiz (Bundesrecht)" }]`); die **Kantone** sind ein eigenes
+Filter-Feld: `options.swissCantons` listet alle 26 Kantone als
+2-Buchstaben-Code + Label —
+
+```json
+{
+  "country": "CH",
+  "default": {
+    "geographic": ["ch"],
+    "legislation": true,
+    "judikatur": true,
+    "courts": [],
+    "germanCourts": [],
+    "swissCantons": [],
+    "eurlex": false,
+    "documentTypes": []
+  },
+  "options": {
+    "geographic": [{ "value": "ch", "label": "Schweiz (Bundesrecht)" }],
+    "swissCantons": [
+      { "value": "ZH", "label": "Zürich" },
+      { "value": "BE", "label": "Bern" },
+      { "value": "VD", "label": "Waadt" }
+    ],
+    "courts": [],
+    "documentTypes": [],
+    "flags": [
+      { "value": "legislation", "label": "Gesetze/Legislation" },
+      { "value": "judikatur", "label": "Judikatur/Entscheidungen" },
+      { "value": "eurlex", "label": "EU-Recht (EUR-Lex)" }
+    ]
+  }
+}
+```
+
+<Info>
+  Gekürzt — die echte Antwort listet alle **26 Kantone**.
+</Info>
+
+Kantonales Recht beziehst du ein, indem du die Codes in
+`filters.swissCantons` übernimmst (zusätzlich zum Bundesrecht-Scope
+`geographic: ["ch"]`).
 
 ## Empfehlung
 

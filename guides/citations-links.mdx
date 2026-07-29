@@ -1,12 +1,21 @@
 ---
 title: "Paragraphen verlinken"
-description: "Warum die Links vorher nicht ankamen — und wie du sie bekommst."
+description: "Fertig verlinkte Felder oder granulare Citation-Map — serverseitig aufgelöst."
 ---
 
 Im generierten Artikel stehen Quellen-Marker wie `[§ 1295 ABGB]` als **Text** im
 `markdown`-Feld — sie sind noch **keine** Links. Die passenden URLs stecken pro
 Quelle in `sources[].html_url`. Die API löst diese Zuordnung serverseitig auf, du
 musst sie **nicht** selbst nachbauen.
+
+<Note>
+  Die **Erstellen-Response** von [`POST /rechtstipps`](/guides/rechtstipps)
+  liefert alle drei Varianten. `markdown_tokenized` + `citations` werden
+  **gespeichert** und kommen auch bei `GET`/`PATCH` zurück (nach einer
+  Bearbeitung neu aufgelöst); nur die fertig verlinkten Felder
+  (`markdown_linked`/`html_linked`) gibt es ausschließlich beim Erstellen — mit
+  dem Snippet unten baust du sie jederzeit aus Tokens + Map nach.
+</Note>
 
 Du hast drei Felder — je nach Bedarf:
 
@@ -62,8 +71,10 @@ function linkify(tokenized, citations) {
 
 <Note>
   Nicht jeder Marker findet eine Quelle (`matched: false`) — z. B. Mehrfach-§§
-  wie `§§ 30, 31 IO`. Diese bleiben bewusst unverlinkter Text, damit nie ein
-  falscher Link entsteht.
+  wie `§§ 30, 31 IO`. Diese bleiben in `markdown_linked` bewusst unverlinkter
+  Text, damit nie ein falscher Link entsteht. Die Citation trägt dann aber ein
+  `parts`-Array mit jedem Teil einzeln aufgelöst (`§ 30 IO`, `§ 31 IO` — je mit
+  `matched`/`url`), falls du Mehrfachzitate selbst granular verlinken willst.
 </Note>
 
 ## Sauberer Veröffentlichungstext

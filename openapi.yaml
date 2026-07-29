@@ -1,49 +1,62 @@
 openapi: 3.1.0
 info:
   title: LexGPT Partner API
-  version: "1.0.0"
+  version: "2.0.0"
   description: |
-    Öffentliche API für Partner-Integrationen. Aktuell zwei Kern-Funktionen:
+    Öffentliche API für Partner-Integrationen. Kern-Funktionen:
 
-    - **Rechtstipp generieren** — Thema rein, recherchierter SEO-Artikel mit
-      verlinkten Paragraphen raus.
-    - **Feedback** — Rückmeldung zu generierten Rechtstipps (und weiteren Inhalten).
+    - **Rechtstipp erstellen & verwalten** — Thema rein, recherchierter
+      SEO-Artikel mit verlinkten Paragraphen raus. Jeder Tipp wird gespeichert
+      und bekommt eine `id` (dient beim Feedback als `target_id`).
+    - **Feedback** — Rückmeldung zu einem Rechtstipp, über seine `id` verknüpft.
 
     Diese Doku beschreibt nur die öffentliche Partner-Fläche. Interne Endpunkte
     (Recherche-Chat, Admin) sind bewusst nicht Teil des Vertrags.
 
-    Aktuell ist nur **AT** freigeschaltet; `DE`/`CH` sind auf der Roadmap
+    **Auth:** Der Tipp-Lebenszyklus (`/rechtstipps`) läuft pro eingeloggtem
+    Anwalt und erfordert dessen **finditoo-WP-JWT** — ein reiner Service-Key wird
+    hier mit `403` abgewiesen. `/feedback` und `/rechtstipp/options` akzeptieren
+    zusätzlich einen Service-Key.
+
+    Verfügbare Länder: **AT** und **CH**. `DE` ist auf der Roadmap
     (Anfragen liefern bis dahin `400`).
 servers:
-  - url: https://app.lex-gpt.ai/api
+  - url: https://dashboard.lex-gpt.ai/api
     description: Produktion
 security:
   - bearerAuth: []
 tags:
   - name: Rechtstipp
-    description: Artikel-Generierung
+    description: Erstellen & verwalten (pro Anwalt gespeichert)
   - name: Feedback
     description: Rückmeldungen
 
 paths:
-  /generate-rechtstipp:
+  /rechtstipps:
     post:
       tags: [Rechtstipp]
-      summary: Rechtstipp oder Blogartikel generieren
+      summary: Rechtstipp oder Blogartikel erstellen
       description: |
         Generiert aus einem Thema einen recherchierten, SEO-tauglichen Artikel
-        (österreichisches Recht). Die Paragraphen im Text sind über
-        `markdown_linked` bereits als Links eingebettet.
+        (österreichisches oder Schweizer Recht, je nach `land`), **speichert**
+        ihn im Verlauf des Anwalts und gibt ihn inkl. `id` zurück. Die `id`
+        verwendest du beim [Feedback](#tag/Feedback) als `target_id`.
 
-        **Minimal:** nur `topic` + `land` senden — `filters` wird dann mit dem
-        Land-Default gefüllt.
-      operationId: generateRechtstipp
+        Die Paragraphen im Text sind über `markdown_linked` bereits als Links
+        eingebettet. **Minimal:** nur `topic` + `land` senden — `filters` wird
+        dann mit dem Land-Default gefüllt.
+
+        **Dauer:** die Recherche + Generierung braucht ~1 Minute — Timeout
+        entsprechend großzügig setzen.
+
+        **Auth:** erfordert das WP-JWT des Anwalts (Service-Key → `403`).
+      operationId: createRechtstipp
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RechtstippRequest'
+              $ref: '#/components/schemas/RechtstippCreate'
             examples:
               minimal_at:
                 summary: Minimal (AT) — filters weggelassen → Land-Default
@@ -59,8 +72,6 @@ paths:
                   kind: "blog"
                   land: "AT"
                   as_of: "2026-07-23"
-                  min_words: 1400
-                  max_words: 2200
                   filters:
                     geographic: ["bundesrecht"]
                     legislation: true
@@ -70,9 +81,30 @@ paths:
                     swissCantons: []
                     eurlex: true
                     documentTypes: []
+              minimal_ch:
+                summary: Minimal (CH) — Land-Default (Bundesrecht, ganze Schweiz)
+                value:
+                  topic: "Kündigungsfristen im Arbeitsvertrag"
+                  kind: "rechtstipp"
+                  land: "CH"
+              kantone_ch:
+                summary: CH mit Kantons-Scope — swissCantons zusätzlich zum Bundesrecht
+                value:
+                  topic: "Ferienanspruch nach OR"
+                  kind: "rechtstipp"
+                  land: "CH"
+                  filters:
+                    geographic: ["ch"]
+                    legislation: true
+                    judikatur: true
+                    courts: []
+                    germanCourts: []
+                    swissCantons: ["ZH", "BE"]
+                    eurlex: false
+                    documentTypes: []
       responses:
         '200':
-          description: Generierter Artikel
+          description: Erstellter & gespeicherter Artikel (inkl. `id`)
           content:
             application/json:
               schema:
@@ -84,8 +116,97 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '401':
           description: Fehlende/ungültige Authentifizierung
+        '403':
+          description: Service-Key statt Anwalts-WP-JWT (dieser Endpunkt braucht einen eingeloggten Anwalt)
         '502':
           description: Generierung fehlgeschlagen
+    get:
+      tags: [Rechtstipp]
+      summary: Verlauf des Anwalts (ohne Volltext)
+      description: |
+        Liste der gespeicherten Tipps des eingeloggten Anwalts, neueste zuerst,
+        ohne Volltext. `kind=all` (Default) liefert Rechtstipps **und** Blogs.
+      operationId: listRechtstipps
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, rechtstipp, blog]
+            default: all
+      responses:
+        '200':
+          description: Verlaufsliste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RechtstippList'
+        '401':
+          description: Fehlende/ungültige Authentifizierung
+        '403':
+          description: Service-Key statt Anwalts-WP-JWT
+
+  /rechtstipps/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: Die beim Erstellen zurückgegebene Tipp-`id`.
+    get:
+      tags: [Rechtstipp]
+      summary: Einen gespeicherten Tipp laden (mit Volltext)
+      operationId: getRechtstipp
+      responses:
+        '200':
+          description: Gespeicherter Tipp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RechtstippStored'
+        '401':
+          description: Fehlende/ungültige Authentifizierung
+        '404':
+          description: Tipp nicht gefunden (oder gehört einem anderen Anwalt)
+    patch:
+      tags: [Rechtstipp]
+      summary: Text vor der Veröffentlichung bearbeiten
+      description: |
+        Aktualisiert `markdown`/`html`/`title`; `word_count` wird nachgeführt.
+        Ändert sich `markdown`, werden `markdown_tokenized` + `citations` gegen
+        die gespeicherten Quellen **neu aufgelöst** (die Token bleiben konsistent
+        zum bearbeiteten Text). Das **Original der Generierung** bleibt intern
+        unverändert erhalten (für die Feedback-Diagnose).
+      operationId: updateRechtstipp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RechtstippUpdate'
+      responses:
+        '200':
+          description: Aktualisierter Tipp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RechtstippStored'
+        '401':
+          description: Fehlende/ungültige Authentifizierung
+        '404':
+          description: Tipp nicht gefunden
+        '422':
+          description: Keine Felder zum Aktualisieren
+    delete:
+      tags: [Rechtstipp]
+      summary: Tipp löschen
+      operationId: deleteRechtstipp
+      responses:
+        '204':
+          description: Gelöscht
+        '401':
+          description: Fehlende/ungültige Authentifizierung
 
   /rechtstipp/options:
     get:
@@ -93,8 +214,9 @@ paths:
       summary: "Verfügbare Optionen pro Land"
       description: |
         Liefert pro Land den Default-Filter-Block **und** die gültigen
-        Auswahlwerte (Bundesländer, Gerichte, documentTypes, Flags), damit ein
-        Selektor gebaut werden kann. Anfangs nur `AT` befüllt.
+        Auswahlwerte (AT: Bundesländer + Gerichte; CH: Kantone via
+        `swissCantons`; plus Flags), damit ein Selektor gebaut werden kann.
+        Verfügbar für `AT` und `CH`; `DE` liefert `400` (Roadmap).
       operationId: getRechtstippOptions
       parameters:
         - name: country
@@ -117,16 +239,21 @@ paths:
   /feedback:
     post:
       tags: [Feedback]
-      summary: Feedback zu einem Inhalt abgeben
+      summary: Feedback zu einem Rechtstipp abgeben
       description: |
         Speichert eine Rückmeldung. Für Rechtstipps: `content_type: "rechtstipp"`
-        und `target_id` (deine Rechtstipp-ID) setzen.
+        und `target_id` = die **`id`** aus der Erstellen-Response setzen. Damit
+        verknüpft das Admin-Board das Feedback mit dem gespeicherten Tipp und
+        zeigt dessen Thema (LLM-Input) und Original-Text (LLM-Output) — du musst
+        also **nichts** vom Tipp mitsenden.
+
+        `session_id` ist optional und defaultet serverseitig auf `target_id` —
+        für Rechtstipps genügt also die `id`.
 
         **Identität:** Reichst du das WP-Token des Anwalts als Bearer durch, wird
-        die Anwalts-Identität automatisch aufgelöst — `user_name`/`user_email`
-        müssen dann nicht mitgesendet werden. Mit dem Service-Key gib die
-        Identität im Body an. Die Response signalisiert, ob gespeichert wurde
-        (kein stiller Verlust).
+        die Anwalts-Identität automatisch aufgelöst. Mit dem Service-Key gib die
+        Identität im Body an (`user_name`/`user_email`). Die Response signalisiert,
+        ob gespeichert wurde (kein stiller Verlust).
       operationId: submitFeedback
       requestBody:
         required: true
@@ -136,14 +263,12 @@ paths:
               $ref: '#/components/schemas/FeedbackRequest'
             examples:
               rechtstipp_wpjwt:
-                summary: Rechtstipp-Feedback (WP-JWT → Identität automatisch)
+                summary: Rechtstipp-Feedback (target_id = die id aus /rechtstipps)
                 value:
-                  session_id: "tipp_8f2a"
                   content_type: "rechtstipp"
-                  target_id: "tipp_8f2a"
-                  target_title: "Kündigungsfristen im Mietrecht"
-                  feedback: "green"
-                  comment: "Sehr brauchbar"
+                  target_id: "3f1c2b4a-5d6e-7089-a1b2-c3d4e5f60718"
+                  feedback: "red"
+                  comment: "§ 1120 ABGB fehlt"
       responses:
         '200':
           description: Ergebnis (gespeichert oder übersprungen)
@@ -160,10 +285,12 @@ components:
       type: http
       scheme: bearer
       description: |
-        `Authorization: Bearer <TOKEN>`. `<TOKEN>` ist entweder dein
-        **Service-Key** (Maschine-zu-Maschine) oder ein **WP-JWT** des Anwalts
-        (empfohlen — ergibt Per-Anwalt-Zuordnung). Behandle Keys als Secret;
-        niemals in Chats/Slack teilen.
+        `Authorization: Bearer <TOKEN>`. Für den Tipp-Lebenszyklus
+        (`/rechtstipps`) ist `<TOKEN>` das **finditoo-WP-JWT des eingeloggten
+        Anwalts** (ein Service-Key wird hier mit `403` abgewiesen). `/feedback`
+        und `/rechtstipp/options` akzeptieren zusätzlich einen **Service-Key**
+        (Maschine-zu-Maschine). Behandle Tokens als Secret; niemals in
+        Chats/Slack teilen.
 
   schemas:
     FilterConfig:
@@ -173,7 +300,10 @@ components:
         geographic:
           type: array
           items: { type: string }
-          description: 'z. B. ["bundesrecht"] (AT). Bestimmt die Retrieval-Jurisdiktion.'
+          description: |
+            Bestimmt die Retrieval-Jurisdiktion: `["bundesrecht"]` (AT, plus
+            optionale Bundesland-Slugs) bzw. `["ch"]` (Schweiz). Gültige Werte
+            liefert `GET /rechtstipp/options`.
         legislation: { type: boolean, default: true }
         judikatur: { type: boolean, default: true }
         courts:
@@ -185,12 +315,15 @@ components:
         swissCantons:
           type: array
           items: { type: string }
+          description: |
+            Nur CH: kantonales Recht zusätzlich zum Bundesrecht —
+            2-Buchstaben-Codes (`ZH`, `BE`, …) aus `GET /rechtstipp/options?country=CH`.
         eurlex: { type: boolean, default: true }
         documentTypes:
           type: array
           items: { type: string }
 
-    RechtstippRequest:
+    RechtstippCreate:
       type: object
       required: [topic]
       properties:
@@ -209,9 +342,9 @@ components:
           default: AT
           description: |
             Rechtsordnung + Wording. ISO-Code bevorzugt; Alt-Freitext
-            ("Österreich") wird toleriert. Steuert NICHT die Retrieval-Jurisdiktion
-            (das macht `filters.geographic`). Aktuell nur **AT** freigeschaltet —
-            `DE`/`CH` liefern `400` (Roadmap).
+            ("Österreich"/"Schweiz") wird toleriert. Steuert NICHT die
+            Retrieval-Jurisdiktion (das macht `filters.geographic`). Verfügbar:
+            **AT** und **CH** — `DE` liefert `400` (Roadmap).
         filters:
           $ref: '#/components/schemas/FilterConfig'
         as_of:
@@ -219,12 +352,14 @@ components:
           format: date
           description: Optionaler Stichtag (YYYY-MM-DD).
           example: "2026-07-23"
-        min_words:
-          type: integer
-          description: Untergrenze; leer → kind-abhängiger Default.
-        max_words:
-          type: integer
-          description: Obergrenze; leer → kind-abhängiger Default.
+
+    RechtstippUpdate:
+      type: object
+      description: Mindestens ein Feld angeben.
+      properties:
+        markdown: { type: string, description: Neuer Artikeltext (Markdown). }
+        html: { type: string, description: Neues HTML (optional; sonst aus Markdown erzeugt). }
+        title: { type: string, description: Neue H1. }
 
     Source:
       type: object
@@ -255,12 +390,30 @@ components:
         url: { type: string, nullable: true }
         parts:
           type: array
-          description: Nur bei Mehrfachzitaten.
-          items: { type: object }
+          description: |
+            Nur bei Mehrfachzitaten (z. B. `§§ 30, 31 IO`): jeder Teil einzeln
+            aufgelöst. Der Marker selbst bleibt in `markdown_linked` bewusst
+            unverlinkt (nie ein falscher Link) — mit `parts` kannst du granular
+            selbst verlinken.
+          items:
+            type: object
+            properties:
+              marker: { type: string, example: "§ 30 IO" }
+              matched: { type: boolean }
+              source_index: { type: integer, nullable: true }
+              url: { type: string, nullable: true }
 
     RechtstippResponse:
       type: object
+      description: |
+        Antwort von `POST /rechtstipps` (alle Generator-Felder PLUS
+        `id`/`created_at`). Die fertig verlinkten Varianten (`markdown_linked`,
+        `html_linked`) gibt es **nur** hier auf der Erstellen-Response;
+        `markdown_tokenized` + `citations` werden gespeichert und kommen auch
+        bei `GET`/`PATCH` zurück (`RechtstippStored`).
       properties:
+        id: { type: string, format: uuid, description: Tipp-ID → beim Feedback als `target_id`. }
+        created_at: { type: string, format: date-time }
         kind: { type: string }
         topic: { type: string }
         title: { type: string, description: Generierte H1. }
@@ -277,8 +430,7 @@ components:
           type: string
           description: |
             Artikel mit Paragraphen bereits als `[Label](URL)` eingebettet — der
-            einfachste Weg zu verlinkten Paragraphen. Für granulare Kontrolle
-            stattdessen `markdown_tokenized` + `citations` selbst zusammensetzen.
+            einfachste Weg zu verlinkten Paragraphen.
         html:
           type: string
           description: Minimal-HTML (marker-frei).
@@ -292,6 +444,53 @@ components:
         citations:
           type: array
           items: { $ref: '#/components/schemas/Citation' }
+
+    RechtstippStored:
+      type: object
+      description: |
+        Gespeicherter Tipp (GET/PATCH). Enthält die persistierten
+        `markdown_tokenized` + `citations` (nach einem `PATCH` mit neuem
+        `markdown` frisch aufgelöst); die fertig verlinkten Felder
+        (`markdown_linked`/`html_linked`) gibt es nur auf der Erstellen-Response —
+        aus `markdown_tokenized` + `citations` lassen sie sich jederzeit
+        clientseitig bauen (siehe Guide „Paragraphen verlinken").
+      properties:
+        id: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        kind: { type: string }
+        topic: { type: string }
+        title: { type: string }
+        markdown: { type: string }
+        html: { type: string }
+        word_count: { type: integer }
+        sources:
+          type: array
+          items: { $ref: '#/components/schemas/Source' }
+        markdown_tokenized:
+          type: string
+          nullable: true
+          description: Marker durch `{{CITATION_n}}` ersetzt (persistiert).
+        citations:
+          type: array
+          items: { $ref: '#/components/schemas/Citation' }
+
+    RechtstippSummary:
+      type: object
+      description: Verlaufs-Eintrag (ohne Volltext).
+      properties:
+        id: { type: string, format: uuid }
+        topic: { type: string }
+        title: { type: string, nullable: true }
+        word_count: { type: integer, nullable: true }
+        created_at: { type: string, format: date-time }
+        kind: { type: string }
+
+    RechtstippList:
+      type: object
+      properties:
+        rechtstipps:
+          type: array
+          items: { $ref: '#/components/schemas/RechtstippSummary' }
 
     OptionsResponse:
       type: object
@@ -313,12 +512,22 @@ components:
                   label: { type: string }
             courts:
               type: array
-              description: Höchstgerichte (Judikatur-Filter).
+              description: Höchstgerichte (Judikatur-Filter; AT).
               items:
                 type: object
                 properties:
                   value: { type: string }
                   label: { type: string }
+            swissCantons:
+              type: array
+              description: |
+                Nur CH befüllt: die 26 Kantone (2-Buchstaben-Code + Label) für
+                `filters.swissCantons`.
+              items:
+                type: object
+                properties:
+                  value: { type: string, example: "ZH" }
+                  label: { type: string, example: "Zürich" }
             documentTypes:
               type: array
               description: DEPRECATED — bewusst leer.
@@ -334,42 +543,39 @@ components:
 
     FeedbackRequest:
       type: object
-      required: [session_id, feedback]
+      required: [feedback]
       properties:
-        session_id:
+        target_id:
           type: string
-          description: Gruppierungs-ID. Für Rechtstipps deine Rechtstipp-ID.
+          description: |
+            Die **`id`** des bewerteten Rechtstipps (aus der Erstellen-Response).
+            Verknüpft das Feedback eindeutig mit dem gespeicherten Tipp.
+        content_type:
+          type: string
+          default: ask
+          description: '`rechtstipp` (bzw. `blog`) setzen, sonst Default `ask`.'
         feedback:
           type: string
           enum: [green, yellow, red, positive, negative]
           description: |
             Ampel `green`/`yellow`/`red` (kanonisch). `positive`/`negative`
             werden gemappt (positive→green, negative→red).
-        content_type:
-          type: string
-          default: ask
-          description: '`ask` (Default), `rechtstipp`, `blog`, `generated_documents`, …'
-        target_id:
-          type: string
-          description: ID des bewerteten Objekts (deine Rechtstipp-ID).
-        target_title:
-          type: string
-          description: Titel/Thema für die Admin-Anzeige.
-        question: { type: string, nullable: true }
-        answer:
+        session_id:
           type: string
           nullable: true
-          description: Optionaler Snapshot des bewerteten Textes.
-        sources:
-          type: array
-          items: { type: object }
+          description: |
+            Optionale Gruppierungs-ID. Fehlt sie, defaultet der Server auf
+            `target_id` — für Rechtstipps also nicht nötig.
+        target_title:
+          type: string
+          nullable: true
+          description: Optional; nur als Fallback-Anzeige, wenn kein `target_id`-Join greift.
         comment: { type: string, nullable: true }
         user_name:
           type: string
           nullable: true
           description: Nur nötig ohne WP-JWT (mit WP-JWT automatisch aus dem Token).
         user_email: { type: string, nullable: true }
-        qa_log_id: { type: integer, nullable: true }
 
     FeedbackResponse:
       type: object

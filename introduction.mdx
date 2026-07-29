@@ -6,8 +6,9 @@ description: "Rechtstipps generieren und Feedback geben — für Partner-Integra
 Die LexGPT Partner API bietet zwei Kern-Funktionen für deine Integration:
 
 <CardGroup cols={2}>
-  <Card title="Rechtstipp generieren" icon="file-pen" href="/guides/generate-rechtstipp">
-    Thema rein, recherchierter SEO-Artikel mit verlinkten Paragraphen raus.
+  <Card title="Rechtstipp erstellen" icon="file-pen" href="/guides/rechtstipps">
+    Thema rein, recherchierter SEO-Artikel mit verlinkten Paragraphen raus —
+    gespeichert, mit `id` fürs Feedback.
   </Card>
   <Card title="Feedback" icon="thumbs-up" href="/guides/feedback">
     Rückmeldung zu generierten Rechtstipps (und weiteren Inhalten).
@@ -17,16 +18,17 @@ Die LexGPT Partner API bietet zwei Kern-Funktionen für deine Integration:
 ## Basis-URL
 
 ```
-https://app.lex-gpt.ai/api
+https://dashboard.lex-gpt.ai/api
 ```
 
 ## Fläche
 
 | Endpunkt | Zweck |
 | --- | --- |
-| `POST /generate-rechtstipp` | Rechtstipp/Blog generieren |
+| `POST /rechtstipps` | Rechtstipp/Blog erstellen (gespeichert, liefert `id`) |
+| `GET /rechtstipps` · `GET`/`PATCH`/`DELETE /rechtstipps/{id}` | Verlauf, laden, bearbeiten, löschen |
 | `GET /rechtstipp/options` | Verfügbare Auswahlen pro Land |
-| `POST /feedback` | Feedback abgeben |
+| `POST /feedback` | Feedback abgeben (`target_id` = Tipp-`id`) |
 
 <Note>
   Dies ist die öffentliche Partner-Fläche. Interne Endpunkte (Recherche-Chat,
@@ -34,8 +36,8 @@ https://app.lex-gpt.ai/api
 </Note>
 
 <Info>
-  Aktuell ist nur **AT** freigeschaltet; `DE`/`CH` sind auf der Roadmap und
-  liefern bis dahin `400`.
+  Verfügbare Länder: **AT** und **CH** (`land: "CH"` inkl. Kantons-Filter).
+  `DE` ist auf der Roadmap und liefert bis dahin `400`.
 </Info>
 
 Weiter mit dem [Quickstart](/quickstart).
