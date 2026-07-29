@@ -24,6 +24,35 @@ abgewiesen. `/feedback` und `/rechtstipp/options` akzeptieren beide Modi.
   </Card>
 </CardGroup>
 
+## Woher kommt das WP-JWT?
+
+Es ist das **Login-Token von `app.finditoo.com`** (WordPress, JWT-Auth) — dasselbe
+Token, das die finditoo-Session des Anwalts trägt. Es wird **nicht** von LexGPT
+ausgestellt.
+
+- **Aus der bestehenden Session durchreichen:** Ist der Anwalt in deinem Produkt
+  über finditoo eingeloggt, hast du sein JWT bereits — als
+  `Authorization: Bearer <jwt>` an die LexGPT-API weitergeben. Kein zweiter Login.
+- **Zum Testen programmatisch holen:**
+
+  ```bash
+  curl -X POST https://app.finditoo.com/wp-json/jwt-auth/v1/token \
+    -H "Content-Type: application/json" \
+    -d '{ "username": "<test-anwalt>", "password": "<passwort>" }'
+  # → { "token": "eyJ…", … }
+  ```
+
+- **Tokens laufen ab.** Ein abgelaufenes/fremdes Token ergibt
+  `401 {"detail": "Invalid token (neither service key nor valid WP JWT)"}` —
+  dann ein frisches Token holen. Fehlt der Header (oder das `Bearer `-Präfix),
+  kommt `401 {"detail": "Missing Authorization: Bearer <token>"}`.
+
+<Warning>
+  Das JWT muss von der **Produktions-Instanz** `app.finditoo.com` stammen —
+  Tokens einer Staging-/Dev-WordPress-Instanz haben eine andere Signatur und
+  werden mit `401` abgelehnt.
+</Warning>
+
 ## Welchen Modus wann?
 
 - **Rechtstipps (`/rechtstipps`):** **WP-JWT erforderlich.** Der Tipp gehört dem

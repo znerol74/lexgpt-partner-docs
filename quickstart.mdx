@@ -7,7 +7,9 @@ description: "In zwei Requests vom Thema zum verlinkten Rechtstipp — plus Feed
   <Step title="Anwalts-Token bereithalten">
     Der Tipp-Flow läuft pro Anwalt: du brauchst das **finditoo-WP-JWT** des
     eingeloggten Anwalts als Bearer-Token (ein reiner Service-Key wird bei
-    `/rechtstipps` mit `403` abgewiesen). Details unter
+    `/rechtstipps` mit `403` abgewiesen). Das JWT ist das Login-Token von
+    `app.finditoo.com` — aus der bestehenden Anwalts-Session durchreichen oder
+    zum Testen via `POST /wp-json/jwt-auth/v1/token` holen. Details unter
     [Authentifizierung](/authentication).
   </Step>
   <Step title="Rechtstipp erstellen">
