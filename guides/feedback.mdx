@@ -32,7 +32,7 @@ curl -X POST https://dashboard.lex-gpt.ai/api/feedback \
 | `session_id` | – | Gruppierungs-ID; fehlt sie, defaultet der Server auf `target_id`. |
 | `comment` | – | Freitext. |
 | `target_title` | – | Nur Fallback-Anzeige, falls kein `target_id`-Join greift. |
-| `user_name`, `user_email` | – | Nur ohne WP-JWT nötig (siehe Identität). |
+| `user_name`, `user_email` | – | **Veraltet (DSGVO):** werden akzeptiert, aber weder gespeichert noch angezeigt — Feedback ist identitätsfrei. Einfach weglassen. |
 
 ## Werte
 
@@ -47,16 +47,12 @@ also einen der fünf Werte.
 
 ## Identität des Anwalts
 
-<CardGroup cols={2}>
-  <Card title="Mit WP-JWT (empfohlen)" icon="user-check">
-    Reiche das finditoo-Token des Anwalts als Bearer durch — `user_name`/
-    `user_email` werden **automatisch aus dem Token** aufgelöst. Nichts weiter nötig.
-  </Card>
-  <Card title="Mit Service-Key" icon="key">
-    Kein Anwalts-Kontext im Token → gib `user_name` und `user_email` im Body an,
-    sonst fehlt die „welcher Anwalt"-Info.
-  </Card>
-</CardGroup>
+<Note>
+  Feedback wird **identitätsfrei** gespeichert (DSGVO-Entscheidung 2026-08):
+  weder Name noch E-Mail landen in der Datenbank — egal, ob per WP-JWT oder
+  Service-Key gesendet. `user_name`/`user_email` im Body sind veraltet und
+  werden ignoriert; bestehende Integrationen brechen nicht.
+</Note>
 
 ## Response
 
@@ -65,6 +61,7 @@ also einen der fünf Werte.
 ```
 
 <Note>
-  Kein stiller Verlust mehr: lässt sich das Feedback keiner Identität zuordnen,
-  kommt `{ "stored": false, "reason": "…" }` zurück statt einer leeren 200.
+  Kein stiller Verlust: fehlt der Bezug zum bewerteten Objekt (weder
+  `session_id` noch `target_id`), kommt `{ "stored": false, "reason": "…" }`
+  zurück statt einer leeren 200.
 </Note>

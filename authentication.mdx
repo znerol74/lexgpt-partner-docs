@@ -58,9 +58,9 @@ ausgestellt.
 - **Rechtstipps (`/rechtstipps`):** **WP-JWT erforderlich.** Der Tipp gehört dem
   Anwalt und landet in seinem Verlauf; ein Service-Key hat keine Anwalts-Identität
   und bekommt `403`.
-- **Feedback (`/feedback`):** WP-JWT **empfohlen** — dann kommen `user_name`/
-  `user_email` automatisch aus dem Token, und nichts geht verloren. Mit
-  Service-Key gib die Identität im Body an (`user_name`/`user_email`).
+- **Feedback (`/feedback`):** beide Modi genügen. Feedback wird identitätsfrei
+  gespeichert (DSGVO) — `user_name`/`user_email` sind veraltet und werden
+  ignoriert.
 - **Optionen (`/rechtstipp/options`):** beide Modi genügen.
 
 <Warning>

@@ -250,9 +250,9 @@ paths:
         `session_id` ist optional und defaultet serverseitig auf `target_id` —
         für Rechtstipps genügt also die `id`.
 
-        **Identität:** Reichst du das WP-Token des Anwalts als Bearer durch, wird
-        die Anwalts-Identität automatisch aufgelöst. Mit dem Service-Key gib die
-        Identität im Body an (`user_name`/`user_email`). Die Response signalisiert,
+        **Identität:** Feedback wird identitätsfrei gespeichert (DSGVO) — weder
+        Name noch E-Mail landen in der Datenbank. `user_name`/`user_email` im
+        Body sind veraltet und werden ignoriert. Die Response signalisiert,
         ob gespeichert wurde (kein stiller Verlust).
       operationId: submitFeedback
       requestBody:
@@ -576,8 +576,13 @@ components:
         user_name:
           type: string
           nullable: true
-          description: Nur nötig ohne WP-JWT (mit WP-JWT automatisch aus dem Token).
-        user_email: { type: string, nullable: true }
+          deprecated: true
+          description: Veraltet (DSGVO) — wird akzeptiert, aber weder gespeichert noch angezeigt.
+        user_email:
+          type: string
+          nullable: true
+          deprecated: true
+          description: Veraltet (DSGVO) — wird akzeptiert, aber weder gespeichert noch angezeigt.
 
     FeedbackResponse:
       type: object
