@@ -64,14 +64,12 @@ paths:
                   topic: "Kündigungsfristen im Mietrecht"
                   kind: "rechtstipp"
                   land: "AT"
-                  as_of: "2026-07-23"
               voll_at:
                 summary: Voll (AT) — filters explizit
                 value:
                   topic: "Betriebsbedingte Kündigung"
                   kind: "blog"
                   land: "AT"
-                  as_of: "2026-07-23"
                   filters:
                     geographic: ["bundesrecht"]
                     legislation: true
@@ -350,7 +348,11 @@ components:
         as_of:
           type: string
           format: date
-          description: Optionaler Stichtag (YYYY-MM-DD).
+          description: >-
+            Optionaler Stichtag (YYYY-MM-DD). **Derzeit pausiert:** ein
+            gesetzter Wert wird ignoriert, die Antwort basiert auf der
+            aktuellen Rechtslage und enthält dann das Feld
+            `stichtag_hinweis`.
           example: "2026-07-23"
 
     RechtstippUpdate:

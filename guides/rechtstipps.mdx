@@ -23,7 +23,7 @@ Land-Default:
 curl -X POST https://dashboard.lex-gpt.ai/api/rechtstipps \
   -H "Authorization: Bearer $ANWALT_WP_JWT" \
   -H "Content-Type: application/json" \
-  -d '{ "topic": "Kündigungsfristen im Mietrecht", "kind": "rechtstipp", "land": "AT", "as_of": "2026-07-23" }'
+  -d '{ "topic": "Kündigungsfristen im Mietrecht", "kind": "rechtstipp", "land": "AT" }'
 ```
 
 <Warning>
@@ -39,7 +39,7 @@ curl -X POST https://dashboard.lex-gpt.ai/api/rechtstipps \
 | `kind` | `rechtstipp` \| `blog` | `rechtstipp` | Kurz (Endkunden) vs. länger (Fachpublikum). |
 | `land` | `AT` \| `DE` \| `CH` | `AT` | Rechtsordnung + Wording. Verfügbar: **AT** und **CH**. |
 | `filters` | FilterConfig | Land-Default | Retrieval-Scope. Weglassen → Land-Default. |
-| `as_of` | date | — | Stichtag (YYYY-MM-DD). |
+| `as_of` | date | — | Stichtag (YYYY-MM-DD). **Derzeit pausiert** — wird ignoriert, Antwort enthält dann `stichtag_hinweis`. |
 
 <Warning>
   `land` steuert Formulierung und Rechtsordnung, **nicht** die
