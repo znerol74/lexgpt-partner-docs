@@ -137,7 +137,26 @@ LexGPT-Dashboard zeigt.
 | `GET /rechtstipps?kind=all` | Verlaufsliste (ohne Volltext), neueste zuerst. |
 | `GET /rechtstipps/{id}` | Einen Tipp mit Volltext laden. |
 | `PATCH /rechtstipps/{id}` | `markdown`/`html`/`title` vor der Veröffentlichung bearbeiten. |
+| `POST /rechtstipps/{id}/refine` | Text per KI-Anweisung nachbessern (siehe unten). |
 | `DELETE /rechtstipps/{id}` | Tipp löschen. |
+
+## Nachbessern per KI-Anweisung
+
+Sagt der generierte Text nicht zu, muss nicht neu generiert werden:
+`POST /rechtstipps/{id}/refine` überarbeitet den **aktuellen** Text nach einer
+freien Anweisung — ideal für eine Chat-artige Nachbesserungs-Box im eigenen
+Backend.
+
+```json
+{ "instruction": "Ergänze ein Unterthema zur Verjährung" }
+```
+
+Die Antwort ist der komplette aktualisierte Tipp (gleiches Schema wie `GET`).
+Eigenschaften: arbeitet auf dem gespeicherten Markdown weiter (auch nach
+`PATCH`-Bearbeitungen), **keine neue Recherche** — Quellen und Zitatmarker
+bleiben erhalten; schlägt die Überarbeitung fehl (`502`), bleibt der Text
+unverändert. Jede Verfeinerungsrunde zählt als eine Anfrage ins Kontingent
+des Anwalts.
 
 <Info>
   `GET`/`PATCH` liefern neben `markdown`/`html`/`sources` auch die

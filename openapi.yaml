@@ -206,6 +206,56 @@ paths:
         '401':
           description: Fehlende/ungültige Authentifizierung
 
+  /rechtstipps/{id}/refine:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: Die beim Erstellen zurückgegebene Tipp-`id`.
+    post:
+      tags: [Rechtstipp]
+      summary: Text per KI-Anweisung nachbessern
+      description: |
+        Überarbeitet den **aktuellen** Text nach einer freien Anweisung des
+        Anwalts (z. B. „Ergänze ein Unterthema zur Verjährung", „Kürzer und
+        lockerer"). Arbeitet auf dem gespeicherten Markdown weiter — auch
+        manuelle Bearbeitungen bleiben erhalten; es findet **keine neue
+        Recherche** statt, Quellen und Zitatmarker bleiben unangetastet.
+        Persistiert wie `PATCH` (Wortzahl, HTML und Zitat-Token werden
+        nachgeführt). Jede Runde zählt als eine Anfrage ins Kontingent.
+      operationId: refineRechtstipp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [instruction]
+              properties:
+                instruction:
+                  type: string
+                  minLength: 3
+                  maxLength: 2000
+                  description: Anweisung an die KI, was am Text zu ändern ist.
+      responses:
+        '200':
+          description: Überarbeiteter Tipp (gleiches Schema wie GET)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RechtstippStored'
+        '401':
+          description: Fehlende/ungültige Authentifizierung
+        '402':
+          description: Anfragenkontingent aufgebraucht (nur bei harter Sperre)
+        '404':
+          description: Tipp nicht gefunden (oder gehört einem anderen Anwalt)
+        '422':
+          description: Anweisung fehlt oder ist zu lang
+        '502':
+          description: Verfeinerung fehlgeschlagen — Text bleibt unverändert
+
   /rechtstipp/options:
     get:
       tags: [Rechtstipp]
