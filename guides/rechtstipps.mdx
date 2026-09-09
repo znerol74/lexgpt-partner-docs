@@ -37,6 +37,7 @@ curl -X POST https://dashboard.lex-gpt.ai/api/rechtstipps \
 | --- | --- | --- | --- |
 | `topic` | string | — | **Pflicht.** Thema/Fragestellung. |
 | `kind` | `rechtstipp` \| `blog` | `rechtstipp` | Kurz (Endkunden) vs. länger (Fachpublikum). |
+| `stichpunkte` | string (max. 1500) | — | Optionale Stichpunkte, die der Artikel berücksichtigen soll (Unterthemen, Zielgruppe, Pflicht-Aspekte). Steuern die Schwerpunkte; rechtliche Aussagen bleiben an die Recherche gebunden. |
 | `land` | `AT` \| `DE` \| `CH` | `AT` | Rechtsordnung + Wording. Verfügbar: **AT** und **CH**. |
 | `filters` | FilterConfig | Land-Default | Retrieval-Scope. Weglassen → Land-Default. |
 | `as_of` | date | — | Stichtag (YYYY-MM-DD). **Derzeit pausiert** — wird ignoriert, Antwort enthält dann `stichtag_hinweis`. |

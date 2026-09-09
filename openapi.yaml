@@ -384,6 +384,15 @@ components:
           enum: [rechtstipp, blog]
           default: rechtstipp
           description: '`rechtstipp` (kurz, Endkunden) oder `blog` (länger, Fachpublikum).'
+        stichpunkte:
+          type: string
+          maxLength: 1500
+          description: |
+            Optionale Stichpunkte des Anwalts, die der Artikel berücksichtigen
+            soll (z. B. Unterthemen, Zielgruppe, Pflicht-Aspekte). Sie steuern
+            die Schwerpunkte; rechtliche Aussagen bleiben an die interne
+            Recherche gebunden. Leer/fehlend = Verhalten wie bisher.
+          example: "- Sonderfall befristeter Vertrag\n- Zielgruppe Vermieter"
         land:
           type: string
           enum: [AT, DE, CH]
