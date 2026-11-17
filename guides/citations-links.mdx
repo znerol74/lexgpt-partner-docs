@@ -9,12 +9,11 @@ Quelle in `sources[].html_url`. Die API löst diese Zuordnung serverseitig auf, 
 musst sie **nicht** selbst nachbauen.
 
 <Note>
-  Die **Erstellen-Response** von [`POST /rechtstipps`](/guides/rechtstipps)
-  liefert alle drei Varianten. `markdown_tokenized` + `citations` werden
-  **gespeichert** und kommen auch bei `GET`/`PATCH` zurück (nach einer
-  Bearbeitung neu aufgelöst); nur die fertig verlinkten Felder
-  (`markdown_linked`/`html_linked`) gibt es ausschließlich beim Erstellen — mit
-  dem Snippet unten baust du sie jederzeit aus Tokens + Map nach.
+  Alle Varianten kommen bei [`POST /rechtstipps`](/guides/rechtstipps) und
+  ebenso bei `GET`/`PATCH /rechtstipps/{id}` und `/refine`. Beim Laden und nach
+  einer Bearbeitung werden sie aus dem gespeicherten Stand berechnet, passend
+  zum aktuellen Text. `markdown_tokenized` + `citations` werden gespeichert und
+  nach einem `PATCH` mit neuem `markdown` neu aufgelöst.
 </Note>
 
 Du hast drei Felder — je nach Bedarf:
@@ -83,7 +82,64 @@ function linkify(tokenized, citations) {
   Text, damit nie ein falscher Link entsteht. Die Citation trägt dann aber ein
   `parts`-Array mit jedem Teil einzeln aufgelöst (`§ 30 IO`, `§ 31 IO` — je mit
   `matched`/`url`), falls du Mehrfachzitate selbst granular verlinken willst.
+  Steht die zitierte Norm in keiner Quelle, kommt zusätzlich ein Prüfhinweis
+  mit `kennung: "norm_ohne_quelle"` (siehe [Rechtstipps](/guides/rechtstipps)).
 </Note>
+
+## Quellen-Vorschau (Textauszug)
+
+Jede Quelle bringt ihren **Textauszug** gleich mit: `sources[].content` ist die
+Fundstelle, auf die sich der Artikel stützt — derselbe Text, den LexGPT im
+Quellen-Panel neben dem Artikel zeigt. Du brauchst dafür **keinen** zusätzlichen
+Aufruf: das Feld steckt in der Erstellen-Response und kommt auch bei
+`GET`/`PATCH` zurück.
+
+Zu einem Link findest du den Auszug über die `citations` (`source_index` zeigt
+auf die Quelle). Wer mit `markdown_linked`/`html_linked` arbeitet und beim Klick
+nur die URL kennt, baut sich einmal pro Tipp eine Zuordnung URL → Quelle:
+
+```js
+// Einmal pro Rechtstipp aus der API-Antwort (POST, GET oder PATCH) bauen.
+function buildSourcePreviews(tipp) {
+  const sources = tipp.sources ?? [];
+  const byUrl = new Map();
+  const add = (url, sourceIndex) => {
+    const s = sources[sourceIndex];
+    if (url && s?.content && !byUrl.has(url)) byUrl.set(url, s);
+  };
+  // Zuerst die Quelle, auf die der Marker aufgelöst wurde (präzise) …
+  for (const c of tipp.citations ?? []) {
+    if (c.matched) add(c.url, c.source_index);
+    for (const p of c.parts ?? []) if (p.matched) add(p.url, p.source_index);
+  }
+  // … dann alle übrigen Quellen über ihren Volltext-Link.
+  sources.forEach((s, i) => add(s.html_url, i));
+  return byUrl;
+}
+
+// Beim Klick auf einen Paragraphen-Link:
+const previews = buildSourcePreviews(tipp);
+const source = previews.get(link.getAttribute("href"));
+if (source) {
+  previewEl.textContent = source.content; // als Text setzen, nie als HTML
+}
+```
+
+<Note>
+  `content` ist **Klartext** (kein HTML). Am besten in einen scrollbaren Kasten
+  setzen, mit `white-space: pre-line` bleiben etwaige Zeilenumbrüche erhalten.
+  Der Auszug umfasst meist bis zu ~1.200 Zeichen und kann mitten im Satz
+  enden; bei Entscheidungen, die im Thema oder in den Stichpunkten genannt
+  sind, ist er länger. Den vollständigen Text liefert weiter der Link
+  (`html_url`).
+</Note>
+
+<Info>
+  Bearbeitet der Anwalt den Artikel in deinem Editor, bleiben die Links (URLs)
+  erhalten — die Vorschau funktioniert also weiter, solange du `sources` und
+  `citations` zum Tipp aufbewahrst oder per `GET /rechtstipps/{id}` neu lädst.
+  Fehlt bei einer Quelle `content` (sehr alte Tipps), zeig einfach nur den Link.
+</Info>
 
 ## Sauberer Veröffentlichungstext
 

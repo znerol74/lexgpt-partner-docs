@@ -116,8 +116,43 @@ paths:
           description: Fehlende/ungültige Authentifizierung
         '403':
           description: Service-Key statt Anwalts-WP-JWT (dieser Endpunkt braucht einen eingeloggten Anwalt)
+        '422':
+          description: |
+            Kein Artikel erstellt. Mit `detail.code = "entscheidung_nicht_gefunden"`:
+            `topic` oder `stichpunkte` nennen eine Entscheidung (Geschäftszahl wie
+            „7 Ob 81/26a“), die LexGPT weder in seinen Quellen noch im RIS findet.
+            Damit nichts Erfundenes über diese Entscheidung entsteht, wird kein
+            Artikel geschrieben, nichts gespeichert und keine Anfrage gezählt.
+            Mit `detail.code = "zu_viele_entscheidungen"`: Die Eingabe nennt mehr
+            Entscheidungen, als eine Anfrage lädt (höchstens 3). Die übrigen wurden
+            nicht abgefragt, das heißt **nicht**, dass es sie nicht gibt. Auch dann
+            entsteht kein Artikel. Mit weniger genannten Entscheidungen erneut senden.
+            Zeige `detail.message` dem Nutzer an.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorCoded' }
+              example:
+                detail:
+                  code: entscheidung_nicht_gefunden
+                  message: "Die Entscheidung 7Ob81/26a wurde im RIS nicht gefunden. Deshalb wurde kein Artikel erstellt, damit nichts Falsches über diese Entscheidung veröffentlicht wird. Bitte prüfen Sie die Geschäftszahl oder formulieren Sie das Thema ohne sie."
+                  geschaeftszahlen: ["7Ob81/26a"]
         '502':
           description: Generierung fehlgeschlagen
+        '503':
+          description: |
+            Kein Artikel erstellt. Mit `detail.code = "ris_nicht_erreichbar"`: Die
+            genannte Entscheidung ließ sich gerade nicht aus dem RIS holen (RIS
+            antwortet nicht oder ist ausgelastet). Das heißt **nicht**, dass es die
+            Entscheidung nicht gibt. Nichts wird gespeichert oder gezählt. Später
+            erneut versuchen und `detail.message` dem Nutzer anzeigen.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorCoded' }
+              example:
+                detail:
+                  code: ris_nicht_erreichbar
+                  message: "Die Entscheidung 7Ob81/26a konnte gerade nicht aus dem RIS geladen werden. Deshalb wurde kein Artikel erstellt. Bitte versuchen Sie es in einigen Minuten erneut."
+                  geschaeftszahlen: ["7Ob81/26a"]
     get:
       tags: [Rechtstipp]
       summary: Verlauf des Anwalts (ohne Volltext)
@@ -240,11 +275,32 @@ paths:
                   description: Anweisung an die KI, was am Text zu ändern ist.
       responses:
         '200':
-          description: Überarbeiteter Tipp (gleiches Schema wie GET)
+          description: |
+            Überarbeiteter Tipp (gleiches Schema wie GET), dazu die Warnliste
+            `unbelegte_geschaeftszahlen` für den überarbeiteten Text. Auch die
+            Überarbeitung läuft durch die Prüfliste der Rechtsordnung
+            (`pruefhinweise`).
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RechtstippStored'
+                allOf:
+                  - $ref: '#/components/schemas/RechtstippStored'
+                  - type: object
+                    properties:
+                      unbelegte_geschaeftszahlen:
+                        type: array
+                        items: { type: string }
+                        description: |
+                          Geschäftszahlen im überarbeiteten Text, die durch keine
+                          gespeicherte Quelle belegt sind (vereinheitlichte Form).
+                          Leer, wenn alles belegt ist. Der Text wird nicht verändert.
+                        example: []
+                      pruefhinweise:
+                        type: array
+                        items: { $ref: '#/components/schemas/Pruefhinweis' }
+                        description: |
+                          Offene Punkte der Prüfliste nach der Überarbeitung (wie
+                          beim Erstellen). Leer, wenn nichts offen ist.
         '401':
           description: Fehlende/ungültige Authentifizierung
         '402':
@@ -430,6 +486,15 @@ components:
         title: { type: string, nullable: true }
         category: { type: string, nullable: true, example: "bundesrecht" }
         source_id: { type: string, nullable: true }
+        geschaeftszahlen:
+          type: array
+          items: { type: string }
+          description: >-
+            Bei Gerichtsentscheidungen alle Geschäftszahlen in vereinheitlichter
+            Form (z. B. "7Ob81/26a"), sonst leer.
+          example: ["7Ob81/26a"]
+        court: { type: string, nullable: true, example: "OGH", description: Gericht bei Entscheidungen. }
+        decision_date: { type: string, nullable: true, example: "2026-08-18", description: Entscheidungsdatum (ISO). }
         html_url:
           type: string
           nullable: true
@@ -437,7 +502,10 @@ components:
         content:
           type: string
           nullable: true
-          description: Textauszug (Fundstelle).
+          description: >-
+            Textauszug der Fundstelle als Klartext (meist bis ca. 1.200 Zeichen),
+            für eine Quellen-Vorschau neben dem Link. Siehe Guide „Paragraphen
+            verlinken", Abschnitt „Quellen-Vorschau".
 
     Citation:
       type: object
@@ -468,10 +536,9 @@ components:
       type: object
       description: |
         Antwort von `POST /rechtstipps` (alle Generator-Felder PLUS
-        `id`/`created_at`). Die fertig verlinkten Varianten (`markdown_linked`,
-        `html_linked`) gibt es **nur** hier auf der Erstellen-Response;
-        `markdown_tokenized` + `citations` werden gespeichert und kommen auch
-        bei `GET`/`PATCH` zurück (`RechtstippStored`).
+        `id`/`created_at`). Dieselben Lesefassungen (`markdown_clean`,
+        `markdown_linked`, `html_linked`) liefern auch `GET`/`PATCH`
+        (`RechtstippStored`), berechnet aus dem gespeicherten Stand.
       properties:
         id: { type: string, format: uuid, description: Tipp-ID → beim Feedback als `target_id`. }
         created_at: { type: string, format: date-time }
@@ -507,24 +574,55 @@ components:
         citations:
           type: array
           items: { $ref: '#/components/schemas/Citation' }
+        unbelegte_geschaeftszahlen:
+          type: array
+          items: { type: string }
+          description: |
+            Warnung: Geschäftszahlen von Entscheidungen, die im Artikel vorkommen,
+            aber durch keine Quelle belegt sind (vereinheitlichte Form, z. B.
+            `7Ob81/26a`). Leer, wenn alles belegt ist. Der Text wird nicht
+            verändert. Vor der Veröffentlichung prüfen lassen.
+          example: []
+        pruefhinweise:
+          type: array
+          items: { $ref: '#/components/schemas/Pruefhinweis' }
+          description: |
+            Offene Punkte der Prüfliste der Rechtsordnung (AT, CH). Jeder Text
+            wird gegen typische Fehler geprüft: deutsche Begriffe werden
+            automatisch ersetzt (z. B. „Fachanwalt“ in AT, „ß“ in CH),
+            überholtes oder deutsches Recht wird gezielt nachgebessert. Was
+            danach noch auffällt, steht hier. Leer, wenn nichts offen ist.
+          example: []
 
     RechtstippStored:
       type: object
       description: |
         Gespeicherter Tipp (GET/PATCH). Enthält die persistierten
         `markdown_tokenized` + `citations` (nach einem `PATCH` mit neuem
-        `markdown` frisch aufgelöst); die fertig verlinkten Felder
-        (`markdown_linked`/`html_linked`) gibt es nur auf der Erstellen-Response —
-        aus `markdown_tokenized` + `citations` lassen sie sich jederzeit
-        clientseitig bauen (siehe Guide „Paragraphen verlinken").
+        `markdown` frisch aufgelöst) und dieselben Lesefassungen wie die
+        Erstellen-Antwort (`markdown_clean`, `markdown_linked`, `html_linked`),
+        berechnet aus dem gespeicherten Stand.
       properties:
         id: { type: string, format: uuid }
         created_at: { type: string, format: date-time }
         kind: { type: string }
         topic: { type: string }
         title: { type: string }
-        markdown: { type: string }
-        html: { type: string }
+        markdown:
+          type: string
+          description: Artikel MIT Quellen-Markern ([§ …]).
+        markdown_clean:
+          type: string
+          description: Artikel OHNE Marker (Veröffentlichung/Kopieren).
+        markdown_linked:
+          type: string
+          description: Artikel mit Paragraphen als `[Label](URL)`, Marker ohne Treffer als `[Label]`.
+        html:
+          type: string
+          description: Minimal-HTML (marker-frei).
+        html_linked:
+          type: string
+          description: HTML mit eingebetteten Paragraphen-Links.
         word_count: { type: integer }
         sources:
           type: array
@@ -536,6 +634,41 @@ components:
         citations:
           type: array
           items: { $ref: '#/components/schemas/Citation' }
+        pruefhinweise:
+          type: array
+          items: { $ref: '#/components/schemas/Pruefhinweis' }
+          description: |
+            Offene Punkte der Prüfliste, bei jedem Laden gegen den aktuellen
+            Text berechnet (nach einem `PATCH` passend zum bearbeiteten Text).
+            Der Hinweis auf einen gekürzten Text kommt nur beim Erstellen.
+
+    Pruefhinweis:
+      type: object
+      description: Ein offener Punkt der Prüfliste. Der Text bleibt unverändert.
+      properties:
+        kennung:
+          type: string
+          description: Kennung der Regel, z. B. `erbschaftssteuer`, `abgeschnitten`, `norm_ohne_quelle`.
+        art:
+          type: string
+          enum: [rechtslage, begriff, form, beleg]
+          description: |
+            `rechtslage` ist eine überholte oder ausländische Rechtslage.
+            `begriff` ist ein Begriff einer anderen Rechtsordnung, der sich
+            nicht automatisch ersetzen ließ. `form` heißt, der Text wurde gekürzt.
+            `beleg` heißt, der Artikel zitiert eine Norm, die in keiner Quelle
+            steht (Kennung `norm_ohne_quelle`, derzeit nur für Österreich).
+        hinweis:
+          type: string
+          description: Die geltende Rechtslage bzw. der richtige Begriff.
+        fundstelle:
+          type: string
+          description: Der betroffene Satz (gekürzt), leer bei `form`.
+      example:
+        kennung: erbschaftssteuer
+        art: rechtslage
+        hinweis: In Österreich gibt es seit 1. August 2008 keine Erbschafts- und Schenkungssteuer mehr. …
+        fundstelle: Für die Erbschaftssteuer ist das Finanzamt zuständig.
 
     RechtstippSummary:
       type: object
@@ -660,3 +793,21 @@ components:
       type: object
       properties:
         detail: { type: string }
+
+    ErrorCoded:
+      type: object
+      description: Fachlicher Fehler mit maschinenlesbarem Code.
+      properties:
+        detail:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [entscheidung_nicht_gefunden, zu_viele_entscheidungen, ris_nicht_erreichbar]
+            message:
+              type: string
+              description: Für Nutzer formulierte Meldung, direkt anzeigbar.
+            geschaeftszahlen:
+              type: array
+              items: { type: string }
+              description: Die betroffenen Geschäftszahlen (vereinheitlichte Form).

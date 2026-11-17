@@ -122,11 +122,94 @@ Die Erstellen-Response enthält den kompletten Artikel in allen Varianten — pl
 | `html` / `html_linked` | Minimal-HTML (marker-frei / mit Links). |
 | `word_count` | Wortzahl (marker-frei gezählt). |
 | `sources` | Recherche-Quellen (inkl. `html_url`). |
+| `unbelegte_geschaeftszahlen` | Warnung: Geschäftszahlen im Artikel ohne Beleg in den Quellen. Leer = alles belegt. |
+| `pruefhinweise` | Offene Punkte der Prüfliste der Rechtsordnung (siehe unten). Leer = nichts offen. |
 
 <Note>
   Für **verlinkte Paragraphen** ist `markdown_linked` der einfachste Weg — einfach
   statt `markdown` durchreichen. Details: [Paragraphen verlinken](/guides/citations-links).
 </Note>
+
+## Genannte Entscheidungen
+
+Nennt `topic` oder `stichpunkte` eine Entscheidung über ihre Geschäftszahl
+(z. B. „OGH 7 Ob 81/26a“, „VwGH Ra 2024/01/0123“), holt LexGPT ihren Volltext
+aus dem RIS. Findet sich die Entscheidung dort nicht, entsteht **kein Artikel**:
+Die Antwort ist `422` mit einem Code, nichts wird gespeichert und keine Anfrage
+gezählt.
+
+```json
+{
+  "detail": {
+    "code": "entscheidung_nicht_gefunden",
+    "message": "Die Entscheidung 7Ob81/26a wurde im RIS nicht gefunden. …",
+    "geschaeftszahlen": ["7Ob81/26a"]
+  }
+}
+```
+
+Nennt die Eingabe mehr als drei Entscheidungen, lädt LexGPT nur die ersten drei.
+Für die übrigen kommt `422` mit dem Code `zu_viele_entscheidungen`, auch dann
+entsteht kein Artikel. Das heißt nicht, dass es diese Entscheidungen nicht gibt.
+Mit weniger genannten Entscheidungen erneut senden.
+
+```json
+{
+  "detail": {
+    "code": "zu_viele_entscheidungen",
+    "message": "Je Anfrage werden höchstens 3 genannte Entscheidungen geladen. …",
+    "geschaeftszahlen": ["4Ob1/24b"]
+  }
+}
+```
+
+Ist das RIS gerade nicht erreichbar, kommt `503` mit dem Code
+`ris_nicht_erreichbar`. Das heißt nicht, dass es die Entscheidung nicht gibt.
+Auch dann entsteht kein Artikel. Ein späterer Versuch kann gelingen.
+
+```json
+{
+  "detail": {
+    "code": "ris_nicht_erreichbar",
+    "message": "Die Entscheidung 7Ob81/26a konnte gerade nicht aus dem RIS geladen werden. …",
+    "geschaeftszahlen": ["7Ob81/26a"]
+  }
+}
+```
+
+Zeige `detail.message` dem Nutzer an. Erstgerichtliche Aktenzeichen wie
+„17 C 66/26g“ lösen diese Prüfung nicht aus.
+
+Kommen im fertigen Artikel Geschäftszahlen vor, die keine Quelle belegt, stehen
+sie in `unbelegte_geschaeftszahlen`. Der Text bleibt unverändert.
+
+## Prüfliste der Rechtsordnung
+
+Jeder Artikel läuft vor der Auslieferung durch eine Prüfliste seiner
+Rechtsordnung (AT, CH). Begriffe einer anderen Rechtsordnung werden
+automatisch ersetzt, etwa „Fachanwalt“ in AT oder „ß“ in CH. Überholtes oder
+deutsches Recht (etwa eine Erbschaftssteuer in Österreich) bessert LexGPT
+gezielt nach. Was danach noch auffällt, steht in `pruefhinweise`:
+
+```json
+"pruefhinweise": [
+  {
+    "kennung": "erbschaftssteuer",
+    "art": "rechtslage",
+    "hinweis": "In Österreich gibt es seit 1. August 2008 keine Erbschafts- und Schenkungssteuer mehr. …",
+    "fundstelle": "Für die Erbschaftssteuer ist das Finanzamt zuständig."
+  }
+]
+```
+
+`art` ist `rechtslage` (überholte oder ausländische Rechtslage), `begriff`
+(Begriff, der sich an dieser Stelle nicht automatisch ersetzen ließ), `form`
+(Text an der Längengrenze gekürzt, `fundstelle` leer) oder `beleg` (der Artikel
+zitiert eine Norm, die in keiner Quelle steht, Kennung `norm_ohne_quelle`,
+derzeit nur für Österreich). Der Text selbst
+bleibt unverändert, die Hinweise sind zum Prüfen vor der Veröffentlichung.
+`GET` und `PATCH` berechnen sie gegen den aktuellen Text neu, auch
+`/refine` liefert sie für den überarbeiteten Text.
 
 ## Verwalten (Verlauf)
 
@@ -157,14 +240,14 @@ Eigenschaften: arbeitet auf dem gespeicherten Markdown weiter (auch nach
 `PATCH`-Bearbeitungen), **keine neue Recherche** — Quellen und Zitatmarker
 bleiben erhalten; schlägt die Überarbeitung fehl (`502`), bleibt der Text
 unverändert. Jede Verfeinerungsrunde zählt als eine Anfrage ins Kontingent
-des Anwalts.
+des Anwalts. Auch die Überarbeitung läuft durch die
+[Prüfliste der Rechtsordnung](#prüfliste-der-rechtsordnung).
 
 <Info>
-  `GET`/`PATCH` liefern neben `markdown`/`html`/`sources` auch die
-  **persistierten** `markdown_tokenized` + `citations` — nach einem `PATCH` mit
-  neuem `markdown` frisch gegen die gespeicherten Quellen aufgelöst. Nur die
-  fertig verlinkten Felder (`markdown_linked`/`html_linked`) gibt es
-  ausschließlich auf der **Erstellen**-Response (aus Tokens + Map jederzeit
-  clientseitig baubar). Bearbeitest du einen Tipp per `PATCH`, bleibt das
+  `GET`/`PATCH` liefern dieselben Textfassungen wie die Erstellen-Antwort:
+  `markdown`, `markdown_clean`, `markdown_linked`, `html`, `html_linked`, dazu
+  die **persistierten** `markdown_tokenized` + `citations`. Nach einem `PATCH`
+  mit neuem `markdown` sind alle frisch gegen die gespeicherten Quellen
+  aufgelöst. Bearbeitest du einen Tipp per `PATCH`, bleibt das
   Original der Generierung intern erhalten (für die Feedback-Diagnose).
 </Info>
