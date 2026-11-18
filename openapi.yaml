@@ -506,6 +506,13 @@ components:
             Textauszug der Fundstelle als Klartext (meist bis ca. 1.200 Zeichen),
             für eine Quellen-Vorschau neben dem Link. Siehe Guide „Paragraphen
             verlinken", Abschnitt „Quellen-Vorschau".
+        nachgeladen:
+          type: boolean
+          description: >-
+            `true`: Diese Quelle stammt nicht aus der Recherche. Der Artikel zitiert
+            die Norm, LexGPT hat den Gesetzestext danach aus dem Bestand geholt, damit
+            der Paragraph verlinkt und prüfbar ist. Dazu gibt es immer einen
+            Prüfhinweis `norm_ohne_quelle`. Fehlt bei Quellen aus der Recherche.
 
     Citation:
       type: object

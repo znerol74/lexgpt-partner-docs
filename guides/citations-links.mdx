@@ -86,6 +86,15 @@ function linkify(tokenized, citations) {
   mit `kennung: "norm_ohne_quelle"` (siehe [Rechtstipps](/guides/rechtstipps)).
 </Note>
 
+<Info>
+  Zitiert der Artikel eine österreichische Norm, die die Recherche nicht
+  geliefert hat, holt LexGPT den Gesetzestext nach dem Schreiben aus dem
+  Bestand dazu. Diese Quelle trägt `nachgeladen: true`, der Paragraph ist damit
+  verlinkt. Weil die Aussage nicht aus der Recherche stammt, bleibt der
+  Prüfhinweis `norm_ohne_quelle`. Zeige nachgeladene Quellen am besten mit
+  einem Vermerk wie „vom Artikel zitiert, nicht recherchiert“ an.
+</Info>
+
 ## Quellen-Vorschau (Textauszug)
 
 Jede Quelle bringt ihren **Textauszug** gleich mit: `sources[].content` ist die

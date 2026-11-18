@@ -205,8 +205,9 @@ gezielt nach. Was danach noch auffällt, steht in `pruefhinweise`:
 `art` ist `rechtslage` (überholte oder ausländische Rechtslage), `begriff`
 (Begriff, der sich an dieser Stelle nicht automatisch ersetzen ließ), `form`
 (Text an der Längengrenze gekürzt, `fundstelle` leer) oder `beleg` (der Artikel
-zitiert eine Norm, die in keiner Quelle steht, Kennung `norm_ohne_quelle`,
-derzeit nur für Österreich). Der Text selbst
+zitiert eine Norm, die nicht aus der Recherche stammt, Kennung
+`norm_ohne_quelle`, derzeit nur für Österreich). Liegt die Norm im Bestand,
+hängt LexGPT ihren Gesetzestext als Quelle mit `nachgeladen: true` an. Der Text selbst
 bleibt unverändert, die Hinweise sind zum Prüfen vor der Veröffentlichung.
 `GET` und `PATCH` berechnen sie gegen den aktuellen Text neu, auch
 `/refine` liefert sie für den überarbeiteten Text.
