@@ -527,14 +527,24 @@ components:
         parts:
           type: array
           description: |
-            Nur bei Mehrfachzitaten (z. B. `§§ 30, 31 IO`): jeder Teil einzeln
-            aufgelöst. Der Marker selbst bleibt in `markdown_linked` bewusst
-            unverlinkt (nie ein falscher Link) — mit `parts` kannst du granular
-            selbst verlinken.
+            Nur bei Markern mit mehreren Zitaten: jeder Teil einzeln aufgelöst.
+            Der Marker selbst bekommt nie einen eigenen Link, weil er für
+            mehrere Normen steht.
+
+            - Mehrere Zitate wie `§ 1159 ABGB, § 20 AngG`, `§ 7 iVm § 12 UrlG`
+              oder `§ 551 ABGB, OGH 2 Ob 583/91`: Jeder Teil trägt `text`, so
+              wie er im Marker steht. `markdown_linked` und `html_linked`
+              verlinken diese Teile im Marker, zum Beispiel
+              `[[§ 551 ABGB](https://…), OGH 2 Ob 583/91]`.
+            - Nummernlisten wie `§§ 30, 31 IO`: Teile ohne `text`, der Marker
+              bleibt in `markdown_linked` unverlinkt. Mit `parts` kannst du
+              selbst verlinken.
           items:
             type: object
             properties:
-              marker: { type: string, example: "§ 30 IO" }
+              marker: { type: string, example: "§ 7 UrlG", description: "Die aufgelöste Norm, bei einem Teil ohne Gesetz mit dem Gesetz des nächsten Teils." }
+              label: { type: string, example: "§ 7 UrlG" }
+              text: { type: string, example: "§ 7", description: "Der Teil wörtlich, wie er im Marker steht. Fehlt bei Nummernlisten." }
               matched: { type: boolean }
               source_index: { type: integer, nullable: true }
               url: { type: string, nullable: true }

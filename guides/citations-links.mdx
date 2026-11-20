@@ -71,17 +71,39 @@ function linkify(tokenized, citations) {
   return tokenized.replace(/\{\{CITATION_(\d+)\}\}/g, (_, i) => {
     const c = citations[Number(i)];
     if (!c) return "";
+    // Mehrere Zitate in einem Marker: jeden Teil im Marker verlinken.
+    if (c.parts?.length && c.parts.every((p) => p.text && c.marker.includes(p.text))) {
+      let rest = c.marker;
+      let out = "";
+      for (const p of c.parts) {
+        const at = rest.indexOf(p.text);
+        out += rest.slice(0, at) + (p.matched && p.url ? `[${p.text}](${p.url})` : p.text);
+        rest = rest.slice(at + p.text.length);
+      }
+      return `[${out}${rest}]`;
+    }
     return c.matched && c.url ? `[${c.label}](${c.url})` : `[${c.label}]`;
   });
 }
 ```
 
 <Note>
-  Nicht jeder Marker findet eine Quelle (`matched: false`) — z. B. Mehrfach-§§
-  wie `§§ 30, 31 IO`. Diese bleiben in `markdown_linked` bewusst unverlinkter
-  Text, damit nie ein falscher Link entsteht. Die Citation trägt dann aber ein
-  `parts`-Array mit jedem Teil einzeln aufgelöst (`§ 30 IO`, `§ 31 IO` — je mit
-  `matched`/`url`), falls du Mehrfachzitate selbst granular verlinken willst.
+  Nicht jeder Marker findet eine Quelle (`matched: false`). Ein Marker mit
+  mehreren Zitaten bekommt nie einen eigenen Link, weil er für mehrere Normen
+  steht. Die Citation trägt dann ein `parts`-Array mit jedem Teil einzeln
+  aufgelöst (je mit `matched`/`url`).
+
+  Bei Zitaten wie `§ 1159 ABGB, § 20 AngG`, `§ 7 iVm § 12 UrlG` oder
+  `§ 551 ABGB, OGH 2 Ob 583/91` trägt jeder Teil zusätzlich `text`, so wie er
+  im Marker steht. `markdown_linked` und `html_linked` verlinken diese Teile
+  direkt im Marker:
+
+  ```md
+  [[§ 551 ABGB](https://www.ris.bka.gv.at/…), OGH 2 Ob 583/91]
+  ```
+
+  Das Beispiel oben macht dasselbe. Bei Nummernlisten wie `§§ 30, 31 IO` fehlt
+  `text`, der Marker bleibt dort unverlinkter Text.
   Steht die zitierte Norm in keiner Quelle, kommt zusätzlich ein Prüfhinweis
   mit `kennung: "norm_ohne_quelle"` (siehe [Rechtstipps](/guides/rechtstipps)).
 </Note>
