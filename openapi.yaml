@@ -49,6 +49,13 @@ paths:
         **Dauer:** die Recherche + Generierung braucht ~1 Minute — Timeout
         entsprechend großzügig setzen.
 
+        **Kontingent:** Jede Erstellung recherchiert und zählt als eine
+        Anfrage ins Kontingent des Anwalts (100 Anfragen je Kalendermonat,
+        gemeinsam mit seinen Anfragen im LexGPT-Dashboard). Ist es erschöpft,
+        antwortet der Endpunkt mit `402` und `detail.code =
+        "kontingent_erschoepft"`, bevor recherchiert wird. Abgelehnte und
+        fehlgeschlagene Aufrufe zählen nicht.
+
         **Auth:** erfordert das WP-JWT des Anwalts (Service-Key → `403`).
       operationId: createRechtstipp
       requestBody:
@@ -114,8 +121,10 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '401':
           description: Fehlende/ungültige Authentifizierung
+        '402':
+          $ref: '#/components/responses/KontingentErschoepft'
         '403':
-          description: Service-Key statt Anwalts-WP-JWT (dieser Endpunkt braucht einen eingeloggten Anwalt)
+          $ref: '#/components/responses/KeinZugriff'
         '422':
           description: |
             Kein Artikel erstellt. Mit `detail.code = "entscheidung_nicht_gefunden"`:
@@ -258,7 +267,9 @@ paths:
         manuelle Bearbeitungen bleiben erhalten; es findet **keine neue
         Recherche** statt, Quellen und Zitatmarker bleiben unangetastet.
         Persistiert wie `PATCH` (Wortzahl, HTML und Zitat-Token werden
-        nachgeführt). Jede Runde zählt als eine Anfrage ins Kontingent.
+        nachgeführt). Die Überarbeitung recherchiert nicht und zählt
+        nicht als Anfrage: sie verbraucht kein Kontingent und ist auch bei
+        erschöpftem Kontingent möglich.
       operationId: refineRechtstipp
       requestBody:
         required: true
@@ -303,8 +314,6 @@ paths:
                           beim Erstellen). Leer, wenn nichts offen ist.
         '401':
           description: Fehlende/ungültige Authentifizierung
-        '402':
-          description: Anfragenkontingent aufgebraucht (nur bei harter Sperre)
         '404':
           description: Tipp nicht gefunden (oder gehört einem anderen Anwalt)
         '422':
@@ -395,6 +404,44 @@ components:
         und `/rechtstipp/options` akzeptieren zusätzlich einen **Service-Key**
         (Maschine-zu-Maschine). Behandle Tokens als Secret; niemals in
         Chats/Slack teilen.
+
+  responses:
+    KontingentErschoepft:
+      description: |
+        Kontingent erschöpft. Jede Recherche ist eine Anfrage, im LexGPT-Dashboard
+        wie über diese API (hier: das Erstellen eines Rechtstipps), und das
+        Kontingent des Anwalts umfasst 100 Anfragen je Kalendermonat. Ab der
+        101. Anfrage lehnt LexGPT mit
+        `detail.code = "kontingent_erschoepft"` ab, bevor recherchiert wird.
+        Nichts wird erzeugt, gespeichert oder gezählt. `detail.message` dem
+        Nutzer anzeigen, `detail.erneuert_am` nennt den Tag, ab dem wieder
+        Anfragen möglich sind.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorCoded' }
+          example:
+            detail:
+              code: kontingent_erschoepft
+              message: "Ihr Kontingent von 100 Anfragen für diesen Monat ist aufgebraucht. Es erneuert sich am 01.12.2026. Für weitere Anfragen wenden Sie sich bitte an Finditoo."
+              erneuert_am: "2026-12-01"
+    KeinZugriff:
+      description: |
+        Kein Zugriff. Entweder ein Service-Key statt des WP-JWT des Anwalts
+        (`detail` ist dann ein Text), oder das Konto des Anwalts ist gesperrt,
+        dann mit Code: `konto_nur_export` nach dem Vertragsende (nur noch
+        Datenexport und Kontolöschung im Dashboard) oder `konto_in_pruefung`
+        für einen noch nicht freigeschalteten Zugang. Gilt für alle
+        `/rechtstipps`-Endpunkte. `detail.message` dem Nutzer anzeigen.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/Error'
+              - $ref: '#/components/schemas/ErrorCoded'
+          example:
+            detail:
+              code: konto_nur_export
+              message: "Ihr Vertrag ist beendet. Sie können Ihre Daten bis einschließlich 31.12.2026 nur noch exportieren oder Ihr Konto löschen."
 
   schemas:
     FilterConfig:
@@ -820,7 +867,13 @@ components:
           properties:
             code:
               type: string
-              enum: [entscheidung_nicht_gefunden, zu_viele_entscheidungen, ris_nicht_erreichbar]
+              enum:
+                - entscheidung_nicht_gefunden
+                - zu_viele_entscheidungen
+                - ris_nicht_erreichbar
+                - kontingent_erschoepft
+                - konto_nur_export
+                - konto_in_pruefung
             message:
               type: string
               description: Für Nutzer formulierte Meldung, direkt anzeigbar.
@@ -828,3 +881,11 @@ components:
               type: array
               items: { type: string }
               description: Die betroffenen Geschäftszahlen (vereinheitlichte Form).
+            erneuert_am:
+              type: string
+              format: date
+              nullable: true
+              description: |
+                Nur bei `kontingent_erschoepft`: Tag, an dem sich das
+                Kontingent erneuert (Monatserster, Zeitzone Europe/Vienna).
+                `null`, wenn es sich nicht erneuert (Testmonat).

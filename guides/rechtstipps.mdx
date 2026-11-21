@@ -31,6 +31,9 @@ curl -X POST https://dashboard.lex-gpt.ai/api/rechtstipps \
   entsprechend großzügig (≥ 120 s).
 </Warning>
 
+Jede Erstellung zählt als eine Anfrage ins [Kontingent](#kontingent) des
+Anwalts.
+
 ## Parameter
 
 | Feld | Typ | Default | Beschreibung |
@@ -212,6 +215,43 @@ bleibt unverändert, die Hinweise sind zum Prüfen vor der Veröffentlichung.
 `GET` und `PATCH` berechnen sie gegen den aktuellen Text neu, auch
 `/refine` liefert sie für den überarbeiteten Text.
 
+## Kontingent
+
+Jede Recherche ist eine Anfrage, im LexGPT-Dashboard wie über diese API. Das
+Kontingent eines Anwalts umfasst **100 Anfragen je Kalendermonat** und gilt für
+beide Wege gemeinsam. Über die API zählen:
+
+| Aufruf | Zählt |
+| --- | --- |
+| `POST /rechtstipps` | eine Anfrage je erstelltem Artikel |
+| `POST /rechtstipps/{id}/refine` | nicht, die Überarbeitung recherchiert nicht |
+| `GET`, `PATCH`, `DELETE`, `/feedback`, `/rechtstipp/options` | nicht |
+
+Abgelehnte und fehlgeschlagene Aufrufe (`4xx`, `5xx`) zählen nicht. Ist das
+Kontingent erschöpft, lehnt `POST /rechtstipps` ab der 101. Anfrage im Monat
+mit `402` ab, bevor recherchiert wird. Überarbeiten (`/refine`) bleibt auch
+dann möglich:
+
+```json
+{
+  "detail": {
+    "code": "kontingent_erschoepft",
+    "message": "Ihr Kontingent von 100 Anfragen für diesen Monat ist aufgebraucht. Es erneuert sich am 01.12.2026. Für weitere Anfragen wenden Sie sich bitte an Finditoo.",
+    "erneuert_am": "2026-12-01"
+  }
+}
+```
+
+Zeige `detail.message` dem Nutzer an. `erneuert_am` ist der Tag, ab dem wieder
+Anfragen möglich sind (Monatserster, Zeitzone Europe/Vienna).
+
+<Note>
+  Nach dem Vertragsende ist das Konto für eine Übergangszeit nur noch für den
+  Datenexport im Dashboard offen. Alle `/rechtstipps`-Aufrufe antworten dann
+  mit `403` und `detail.code = "konto_nur_export"`, die Meldung nennt den
+  letzten Tag. Auch hier `detail.message` anzeigen.
+</Note>
+
 ## Verwalten (Verlauf)
 
 Alle Tipps gehören dem Anwalt (per WP-JWT); es ist derselbe Verlauf, den das
@@ -240,8 +280,9 @@ Die Antwort ist der komplette aktualisierte Tipp (gleiches Schema wie `GET`).
 Eigenschaften: arbeitet auf dem gespeicherten Markdown weiter (auch nach
 `PATCH`-Bearbeitungen), **keine neue Recherche** — Quellen und Zitatmarker
 bleiben erhalten; schlägt die Überarbeitung fehl (`502`), bleibt der Text
-unverändert. Jede Verfeinerungsrunde zählt als eine Anfrage ins Kontingent
-des Anwalts. Auch die Überarbeitung läuft durch die
+unverändert. Die Überarbeitung zählt nicht ins
+[Kontingent](#kontingent) und ist auch bei erschöpftem Kontingent möglich. Auch
+die Überarbeitung läuft durch die
 [Prüfliste der Rechtsordnung](#prüfliste-der-rechtsordnung).
 
 <Info>
